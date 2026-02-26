@@ -6,6 +6,7 @@ MAX_CONN = 100
 SERVER_PORT = 5000
 
 async def recvall(conn):
+    "Collect all the chunks of data  of size BUF_SIZE until the final one is received."
     full_data= bytearray()
     async for data in recv(conn):
         full_data.extend(data)
@@ -30,6 +31,7 @@ def close(sock):
     sock.close()
 
 async def get_connections(sock):
+    "Asynchronously accepts all incoming connections. Other function can iterate over this function to get all the incoming connections and handle the,"
     while True:
         conn,address =  sock.accept()
         conn.setblocking(False)
