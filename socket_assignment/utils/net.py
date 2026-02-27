@@ -15,11 +15,11 @@ async def recvall(conn):
     return full_data
 
 def create_socket():
-    sock = socket.socket()
-    return sock
+    return socket.socket()
+    
 
-def bind_server(sock):
-    sock.bind(("localhost",SERVER_PORT))
+def bind_server(sock, port):
+    sock.bind(("0.0.0.0",port))
 
 def connect(sock, address, port):
     sock.connect((address, port))
