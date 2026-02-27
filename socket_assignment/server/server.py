@@ -18,7 +18,7 @@ async def handle_message(conn,command, headers, data=None):
       pass
 
 
-async def peer_conn(conn):
+async def handle_new_conn(conn):
    try:
         while True:
             data = await recvall(conn)

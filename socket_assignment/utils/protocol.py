@@ -1,11 +1,18 @@
 import base64
 
+
 def parse_headers(lines):
     headers = dict()
-    for line in lines:
-        key, value = line.split(":")
-        headers[key] = value
-    return headers
+    try :
+        for line in lines:
+            key, value = line.split(":")
+            headers[key] = value
+    except ConnectionError as e:
+        print(f"Error:{e}") 
+    except BlockingIOError as be:
+        print(f"Blocking Error:{be}")
+    finally:
+        return headers 
 
 def parse(text):
     "Parses the text data received from a socket into its command, headers and data."
@@ -39,3 +46,10 @@ def encode(command, headers, data=None):
     text =f"{command.upper()}\n\n{headers_text}\n\n{b64_data}" 
     
     return text
+
+def message_to_text(message):
+    return encode(message["command"], message["headers"], message["data"])
+
+def text_to_message(text):
+    command, headers, data = parse(text) 
+    return {"message_id":headers["message_no"], "headers":headers, "data":data, "command":command}
