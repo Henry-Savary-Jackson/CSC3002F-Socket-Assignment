@@ -14,9 +14,12 @@ def parse_headers(lines):
     finally:
         return headers 
 
-def parse(text):
+def parse(data_bytes):
     "Parses the text data received from a socket into its command, headers and data."
-    lines = text.split("\n")
+    data_bytes = data_bytes[4:] # ignore the length
+
+
+    lines = data_bytes.decode().split("\n")
     assert len(lines) >= 4
     command = lines[0]
 
@@ -43,13 +46,36 @@ def encode(command, headers, data=None):
 
     b64_data =base64.b64encode(data).decode() if data else ""
 
-    text =f"{command.upper()}\n\n{headers_text}\n\n{b64_data}" 
+    message_bytes =f"{command.upper()}\n\n{headers_text}\n\n{b64_data}".encode()
     
-    return text
+    return len(message_bytes).to_bytes(4) + text
 
-def message_to_text(message):
+def create_message(command,headers, data=None):
+    output = {"command":command, "headers":headers}
+    if data:
+        output["data"] =data
+    return output
+
+def message_to_bytes(message):
     return encode(message["command"], message["headers"], message["data"])
 
-def text_to_message(text):
-    command, headers, data = parse(text) 
+def bytes_to_message(data_bytes):
+    command, headers, data = parse(data_bytes) 
     return {"message_id":headers["message_no"], "headers":headers, "data":data, "command":command}
+
+
+def create_session_message():
+    pass
+
+def create_challenge_message():
+    pass
+
+def create_authentication_message():
+    pass
+
+def create_authentication_message():
+    pass
+
+
+def create_error_message():
+    pass

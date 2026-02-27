@@ -1,18 +1,20 @@
 import socket
 import asyncio
+from socket_assignment.utils.protocol import bytes_to_message
 
 BUF_SIZE = 4096
 MAX_CONN = 100
 SERVER_PORT = 5000
 
+async def recv_message(conn):
+    async for message_bytes in recvall(conn):
+        yield bytes_to_message(message_bytes)
+
 async def recvall(conn):
-    "Collect all the chunks of data  of size BUF_SIZE until the final one is received."
-    full_data= bytearray()
-    async for data in recv(conn):
-        full_data.extend(data)
-        if len(data) < BUF_SIZE:
-            break
-    return full_data
+    "Continously gives the bytes of the next message."
+    while True:
+        length = int.from_bytes(await recv(conn ,4), byteorder="big")
+        yield  await recv(conn ,length)
 
 def create_socket():
     return socket.socket()
@@ -33,14 +35,18 @@ def close(sock):
 async def get_connections(sock):
     "Asynchronously accepts all incoming connections. Other function can iterate over this function to get all the incoming connections and handle the,"
     while True:
-        conn,address =  sock.accept()
+        conn,address = await asyncio.get_event_loop().sock_accept(sock)
         conn.setblocking(False)
         yield conn, address
 
-async def recv(conn):
+async def recv(conn, n):
+    "Asynchornously gives the next chunk of data from a tcp socket. "
     while True:
-        data =  conn.recv(BUF_SIZE)
+        data =  await asyncio.get_running_loop().sock_recv(conn, n)
+        if not data:
+            break
         yield data
+        
 
 async def send(conn,data:str):
     conn.send(data)

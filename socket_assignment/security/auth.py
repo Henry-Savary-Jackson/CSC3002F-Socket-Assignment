@@ -10,3 +10,7 @@ def create_challenge():
 
 def get_auth_token():
     return base64.b64decode(random.randbytes(TOKEN_SIZE))
+
+# assumed user info already in storage
+def authentication_flow(username):
+    pass

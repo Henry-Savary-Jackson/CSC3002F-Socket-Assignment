@@ -1,37 +1,62 @@
 import uuid
 import asyncio
 from socket_assignment.client import client_username, connections, server_connection, sending_queue, unacked_messages
-from socket_assignment.utils.net import send, recvall
-from socket_assignment.utils.protocol import parse , encode, message_to_text, text_to_message
+from socket_assignment.utils.net import send, recv_message
+
+from socket_assignment import users
+from socket_assignment.server import VALID_COMMANDS_PEER
+from socket_assignment.utils.protocol import parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message
 
 def send_session(username):
     message_id = str(uuid.uuid4())
-    connection  = connection["server"]
-    token =connection["token"]
+    connection_info  = connections["server"]
+    token =connection_info["token"]
     sender = client_username 
+
     headers = {"message_no": message_id, "auth":token, "sender":client_username, "other":username}
-    await send(conn, encode("SESSION", headers))
 
-    text =await recvall(conn)
+    message = create_message("SESSION", headers)
 
-    command, headers, end = parse(text)
+    response_message = await send_message(connection_info["conn"], message)
 
-    if command == "SESSION":
-        pass
+    # get the info from message body
+    info = parse_headers(response_message["data"].decode().split())
+
+    ip = info["ip"]
+    addr = info["addr"]
+    pub_key = info["public_key"]
+    if username in users:
+        users[username].update(info)
+    else:
+        users[username] = info
+    return ip, addr, pub_key
 
 
-async def client_sender(conn_id):
-    connection_info = connections[conn_id]
-    conn = connection_info["connection"] 
+def send_message(conn ,message):
+    future =  asyncio.get_event_loop().create_future()
+    unacked_messages[message["message_id"]] = {"message":message, "future":future}
     try :
-        while True:
-            message = await sending_queue.get()
-            unacked_messages[message["message_id"]] = message
-            send(conn, message_to_text(message).encode() )
-    except ConnectionError as e:
-        print(f"Error:{e}") 
-    except BlockingIOError as be:
-        print(f"Blocking Error:{be}")
+        send(conn,message_to_text(message))
+    except:
+        pass
+    finally:
+        return future
+
+
+def handle_message_client(conn, message):
+    command = message["command"]
+    message_id = message["message_id"]
+    if message_id in unacked_messages:
+        # notify waiting functions
+        future = unacked_messages[message_id]["future"]
+        future.set_result(message)
+        del unacked_messages[message_id]
+
+    if command == "ACK":
+        pass
+    if command == "CHALLENGE":
+        pass
+        
 
 # handle connection 
 async def client_listener(conn_id):
@@ -39,11 +64,8 @@ async def client_listener(conn_id):
     conn = connection_info["connection"] 
     
     try:
-        while True:
-            data = await recvall(conn)
-            data_str = data.decode()
-            command, headers, data = parse(data_str) 
-            handle_message(conn, command, headers, data)
+        async for message in recv_message:
+            handle_message_client(conn, message)
             
     except ConnectionError as e:
       print(f"Error:{e}") 
