@@ -2,10 +2,46 @@ import uuid
 import asyncio
 from socket_assignment.client import  client_username, connections, server_connection, sending_queue, unacked_messages
 from socket_assignment.utils.net import send, recv_message
-
+from socket import*
 from socket_assignment import users
 from socket_assignment.server import VALID_COMMANDS_PEER
 from socket_assignment.utils.protocol import parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message
+
+import asyncio
+from socket import socket, AF_INET, SOCK_STREAM
+
+
+async def async_tcp_client():
+    server_name = "localhost"
+    server_port = None
+    loop = asyncio.get_running_loop()
+    client_socket = socket(AF_INET, SOCK_STREAM)
+    client_socket.setblocking(False)
+    await loop.sock_connect(client_socket, (server_name, server_port))
+    username = input("Insert your username: ")
+    await loop.sock_sendall(client_socket, username.encode())
+    data = await loop.sock_recv(client_socket, 1024)
+    print("From Server:", data.decode())
+
+    client_socket.close()
+
+
+
+async def async_udp_client():
+    server_name = "localhost"
+    server_port = None
+
+    loop = asyncio.get_running_loop()
+
+    client_socket = socket(AF_INET, SOCK_DGRAM)
+    client_socket.setblocking(False)
+
+    username = input("Insert your username: ")
+    await loop.sock_sendto(client_socket, username.encode(), (server_name, server_port))
+    data, addr = await loop.sock_recvfrom(client_socket, 2048)
+    print("From Server:", data.decode())
+    client_socket.close()
+
 
 def check_message_is_reply(conn ,message):
     command = message["command"]
@@ -47,6 +83,6 @@ async def client_listener(conn_id):
       print(f"Blocking Error:{be}")
     finally:
       print(f"Done with {conn.getsockname()}")
-      close(conn)
+      conn.close()
 
 
