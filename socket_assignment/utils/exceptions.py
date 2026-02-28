@@ -24,6 +24,6 @@ def server_excpetions_handled(func):
         except ServerError as se:
             print(e)
             error_msg = create_error_message(e.original_message, e.message)
-            send_message(e.conn, error_msg, awaitable=False)
+            await send_message(e.conn, error_msg, awaitable=False)
 
     return wrapper

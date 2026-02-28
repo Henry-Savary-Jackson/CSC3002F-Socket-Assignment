@@ -10,7 +10,7 @@ client_username =None
 client_public_key_bytes = None
 client_private_key_bytes = None
 
-def send_message(conn ,message, awaitable=True):
+async def send_message(conn ,message, awaitable=True):
     """Given a socket, send this message to this socket
     
     awaitable is used to indicate if you will call await on this function
@@ -20,15 +20,17 @@ def send_message(conn ,message, awaitable=True):
     future =  asyncio.get_event_loop().create_future() if awaitable else None
 
     # keep track of this message as not yet receiving a reply
-    if awaitable:
-        unacked_messages[message["message_id"]] = {"message":message, "future":future}
+    # schedule the sending of data to event-loop
     try :
-        # schedule the sending of data to event-loop
-        asyncio.create_task(send(conn,message_to_text(message)))
-    except Exception as e :
-        print(e)
-    finally:
+        if awaitable:
+            unacked_messages[message["message_id"]] = {"message":message, "future":future}
+        await send(conn,message_to_text(message))
         return future
+    except Exception:
+        if awaitable:
+            unacked_messages.pop(message["message_id"])
+        raise  
+
     # this returns a future, so that the caller can await the response from the remote connection
 
 # for each  user, store ip, addr, connection id, public_key

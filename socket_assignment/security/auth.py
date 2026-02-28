@@ -40,7 +40,17 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
     elif server_type == "PEER":
         ip, port, public_key = await send_session(sender)
 
+
     user = users[sender] 
+
+    if "connection_id" in user and user["connection_id"]:
+        # simply reply
+        connection_info = connections[user["connection_id"]]
+        assert "token" in connection_info
+        token =  connection_info["token"]
+        ack_response =create_ack_message(connect_msg, base64.b64decode(token)) 
+        await send_message(conn,ack_response,awaitable=False)
+        return
 
     challenge = create_challenge()
     challenge_msg = create_challenge_message(connect_msg,challenge)
@@ -70,7 +80,7 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
         } 
 
         success_response = create_ack_message(authenticate_msg, token)
-        send_message(conn, success_response, awaitable=False)
+        await send_message(conn, success_response, awaitable=False)
 
     except nacl.exceptions.BadSignatureError as e:
         print("Bad signature, failed!")

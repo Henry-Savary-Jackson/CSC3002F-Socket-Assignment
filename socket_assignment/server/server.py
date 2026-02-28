@@ -12,6 +12,7 @@ async def handle_message_main_server(conn,message):
    if check_message_is_reply(conn , message):
       return
 
+   command = message["command"]
    if command == "CONNECT":
       await authentication_flow_server(conn, message)
    elif command == "DOWNLOAD":

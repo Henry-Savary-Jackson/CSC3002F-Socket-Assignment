@@ -112,3 +112,6 @@ def create_ack_message(original_message, data=None):
 def create_error_message(original, cause):
     headers = {"explanation":cause}
     return create_message("ERROR", headers, data)
+
+def create_join_message(original, chat_id):
+    return create_message("JOIN", {})
