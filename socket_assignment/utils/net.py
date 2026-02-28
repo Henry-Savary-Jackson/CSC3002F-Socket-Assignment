@@ -13,7 +13,7 @@ async def recv_message(conn):
 async def recvall(conn):
     "Continously gives the bytes of the next message."
     while True:
-        length = int.from_bytes(await recv(conn ,4), byteorder="big")
+        length = int.from_bytes(await recv(conn ,4))
         yield  await recv(conn ,length)
 
 def create_socket():
@@ -23,8 +23,9 @@ def create_socket():
 def bind_server(sock, port):
     sock.bind(("0.0.0.0",port))
 
-def connect(sock, address, port):
-    sock.connect((address, port))
+async def connect(sock, address, port):
+    sock.setblocking(False)
+    await asyncio.get_event_loop().sock_connect(sock, (address, port))
 
 def listen(sock):
     sock.listen(MAX_CONN)
@@ -46,9 +47,10 @@ async def recv(conn, n):
         if not data:
             break
         yield data
+
         
 
 async def send(conn,data:str):
-    conn.send(data)
+    await asyncio.get_running_loop().sock_sendall(conn, data)
 
 

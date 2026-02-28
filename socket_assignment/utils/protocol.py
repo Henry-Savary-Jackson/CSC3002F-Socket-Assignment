@@ -1,7 +1,18 @@
 import base64
+from uuid import uuid4
+import nacl
+
+
+AUTH_TOKEN_HEADER_NAME = "auth"
+MESSAGE_ID_HEADER_NAME = "message_no"
+REPLY_HEADER_NAME = "reply_to"
 
 
 def parse_headers(lines):
+    """given the lines of headers in format
+    key1:value1
+    vconvert them into a python dictionary
+    """
     headers = dict()
     try :
         for line in lines:
@@ -50,8 +61,25 @@ def encode(command, headers, data=None):
     
     return len(message_bytes).to_bytes(4) + text
 
-def create_message(command,headers, data=None):
-    output = {"command":command, "headers":headers}
+def create_message(command,headers=None, data=None,reply=None,token=None):
+    """Create a message object with the given parameters.
+
+    reply is the id of the message this message is reply to. Only give this if this is a reply to another message.
+    otherwise, leave this None.
+
+    token is used for requests that need authentication, such as MESSAGE or INVITE
+    """
+
+    headers = headers or dict()
+
+    output = {"command":command, "headers":headers  }
+    if reply:
+        headers[REPLY_HEADER_NAME] = reply
+    if token:
+        headers[AUTH_TOKEN_HEADER_NAME] = token
+
+    headers[MESSAGE_ID_HEADER_NAME] = uuid4()
+
     if data:
         output["data"] =data
     return output
@@ -61,21 +89,26 @@ def message_to_bytes(message):
 
 def bytes_to_message(data_bytes):
     command, headers, data = parse(data_bytes) 
-    return {"message_id":headers["message_no"], "headers":headers, "data":data, "command":command}
+    return {"message_id":headers[MESSAGE_ID_HEADER_NAME], "headers":headers, "data":data, "command":command}
 
 
-def create_session_message():
-    pass
+def create_session_message(other_user,current_user, token):
+    headers = {"sender":current_user, "other":other_user}
+    return create_message("SESSION", headers, token=token)
 
-def create_challenge_message():
-    pass
+def create_challenge_message(original,challenge):
+    data = challenge.encode()
+    headers = {"sender": original["headers"]["sender"]  }
+    return create_message("CHALLENGE", headers, data, reply=original["message_id"])
 
-def create_authentication_message():
-    pass
+def create_authentication_message(challenge_msg,private_key:nacl.signing.SigningKey, sender):
+    signature = private_key.sign(challenge_msg)
+    headers = {"sender":sender}
+    return create_message("AUTHENTICATE", headers, signature, reply=challenge_msg["message_id"])
 
-def create_authentication_message():
-    pass
+def create_ack_message(original_message, data=None):
+    return create_message("ACK", data=data)
 
-
-def create_error_message():
-    pass
+def create_error_message(original, cause):
+    headers = {"explanation":cause}
+    return create_message("ERROR", headers, data)
