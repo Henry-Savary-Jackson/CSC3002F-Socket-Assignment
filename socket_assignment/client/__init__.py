@@ -1,7 +1,7 @@
 import asyncio
 import base64
 from socket_assignment.utils.net import create_socket, send, udp_server
-from socket_assignment.utils.protocol import create_socket, create_session_message , parse_headers
+from socket_assignment.utils.protocol import create_session_message , parse_headers
 
 server_connection = create_socket()
 server_adress = "localhost"

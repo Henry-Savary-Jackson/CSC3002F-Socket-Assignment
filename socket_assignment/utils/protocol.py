@@ -1,6 +1,7 @@
 import base64
 from uuid import uuid4
-import nacl
+from nacl.signing import SigningKey, VerifyKey
+import socket
 
 
 AUTH_TOKEN_HEADER_NAME = "auth"
@@ -112,7 +113,7 @@ def create_challenge_message(original,challenge):
     headers = {"sender": original["headers"]["sender"]  }
     return create_message("CHALLENGE", headers, data, reply=original["message_id"])
 
-def create_authentication_message(challenge_msg,private_key:nacl.signing.SigningKey, sender):
+def create_authentication_message(challenge_msg,private_key:SigningKey, sender):
     signature = private_key.sign(challenge_msg)
     headers = {"sender":sender}
     return create_message("AUTHENTICATE", headers, signature, reply=challenge_msg["message_id"])
