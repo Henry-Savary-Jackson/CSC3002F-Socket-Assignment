@@ -7,7 +7,6 @@ from socket_assignment import users, connections, unacked_messages
 from socket_assignment.client import send_message
 from socket_assignment.utils.net import create_socket, connect, recv_message, close
 from socket_assignment.utils.protocol import create_message, create_authentication_message
-from socket_assignment.client.client import client_listener
 
 def generate_keypair():
     signing_key = nacl.signing.SigningKey.generate()

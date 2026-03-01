@@ -6,7 +6,7 @@ import asyncio
 from socket_assignment.utils.exceptions import server_excpetions_handled
 from socket_assignment.utils.net import create_socket ,get_connections, send, recvall, close, recv_message
 from socket_assignment.client import users, unacked_messages, send_message
-from socket_assignment.client.client import send_session, check_message_is_reply 
+from socket_assignment.client.client import send_session  
 from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
 from socket_assignment import connections
