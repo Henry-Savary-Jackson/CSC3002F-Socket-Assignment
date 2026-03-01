@@ -13,8 +13,16 @@ async def recv_message(conn):
 async def recvall(conn):
     "Continously gives the bytes of the next message."
     while True:
-        length = int.from_bytes(await recv(conn ,4))
-        yield  await recv(conn ,length)
+        length_data  = await recv(conn ,4)
+        if length_data is None:
+            break
+        length = int.from_bytes(length_data, byteorder="big")
+        print(length)
+        data =   await recv(conn ,length)
+        print(length_data+data )
+        if data is None:
+            break
+        yield data
 
 def create_socket():
     return socket.socket()
@@ -42,16 +50,16 @@ async def get_connections(sock):
 
 async def recv(conn, n):
     "Asynchornously gives the next chunk of data from a tcp socket. "
-    while True:
-        data =  await asyncio.get_running_loop().sock_recv(conn, n)
-        if not data:
-            break
-        yield data
+    data = await asyncio.get_event_loop().sock_recv(conn, n)
+    if not data:
+        return None
+    return data
 
         
 
-async def send(conn,data:str):
-    await asyncio.get_running_loop().sock_sendall(conn, data)
+async def send(conn,data):
+    print(data)
+    await asyncio.get_event_loop().sock_sendall(conn, data)
 
 def udp_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

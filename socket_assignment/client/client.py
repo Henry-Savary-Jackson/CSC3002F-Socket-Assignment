@@ -67,16 +67,17 @@ def check_message_is_reply(conn ,message):
         future = unacked_messages[reply_to_id]["future"]
         future.set_result(message)
         del unacked_messages[message_id]
+
 async def authenticate(conn, username, signing_key, verify_key):
     public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
     connect_msg = create_message("CONNECT", headers={
         "sender": username,
         "public_key": public_key_b64,
         "ip": "127.0.0.1",
-        "port": "0"
+        "port": "0",
+        "udp_port": "1"
     })
-    future = await send_message(conn, connect_msg, awaitable=True)
-    challenge_msg = await future
+    challenge_msg = await send_message(conn, connect_msg, awaitable=True)
     if challenge_msg["command"] != "CHALLENGE":
         print("Expected CHALLENGE, got", challenge_msg["command"])
         return False
@@ -84,8 +85,7 @@ async def authenticate(conn, username, signing_key, verify_key):
     signature = signing_key.sign(challenge_data)
     auth_msg = create_message("AUTHENTICATE", headers={"sender": username},
                               data=signature, reply=challenge_msg["message_id"])
-    future = await send_message(conn, auth_msg, awaitable=True)
-    ack = await future
+    ack = await send_message(conn, auth_msg, awaitable=True)
     if ack["command"] == "ACK":
         print("Authentication successful")
         return True
@@ -168,7 +168,7 @@ async def main():
     server_port = 5000
     username = input("Enter your username: ")
     signing_key, verify_key = generate_keypair()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock = socket.socket()
     sock.setblocking(False)
     loop = asyncio.get_running_loop()
     await loop.sock_connect(sock, (server_host, server_port))

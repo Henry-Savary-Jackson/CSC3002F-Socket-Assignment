@@ -109,6 +109,7 @@ async def handle_new_conn(conn):
     global active_connections
     try:
         async for message in recv_message(conn):
+            print(message)
             await handle_message_main_server(conn, message)
     except (ConnectionError, BlockingIOError) as e:
         print(f"Connection error: {e}")

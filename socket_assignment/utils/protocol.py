@@ -28,8 +28,6 @@ def parse_headers(lines):
 
 def parse(data_bytes):
     "Parses the text data received from a socket into its command, headers and data."
-    data_bytes = data_bytes[4:] # ignore the length
-
 
     lines = data_bytes.decode().split("\n")
     assert len(lines) >= 4
@@ -60,7 +58,7 @@ def encode(command, headers, data=None):
 
     message_bytes =f"{command.upper()}\n\n{headers_text}\n\n{b64_data}".encode()
     
-    return len(message_bytes).to_bytes(4) + text
+    return len(message_bytes).to_bytes(4, byteorder="big") + message_bytes
 
 def create_message(command,headers=None, data=None,reply=None,token=None):
     """Create a message object with the given parameters.
@@ -79,14 +77,16 @@ def create_message(command,headers=None, data=None,reply=None,token=None):
     if token:
         headers[AUTH_TOKEN_HEADER_NAME] = token
 
-    headers[MESSAGE_ID_HEADER_NAME] = uuid4()
+    output["message_id"] = str(uuid4())
+    headers[MESSAGE_ID_HEADER_NAME] = output["message_id"]
 
     if data:
         output["data"] =data
+    
     return output
 
 def message_to_bytes(message):
-    return encode(message["command"], message["headers"], message["data"])
+    return encode(message["command"], message["headers"], message["data"] if "data" in message else None )
 
 def bytes_to_message(data_bytes):
     command, headers, data = parse(data_bytes) 
@@ -109,7 +109,6 @@ def create_session_message(other_user,current_user, token):
     return create_message("SESSION", headers, token=token)
 
 def create_challenge_message(original,challenge):
-    data = challenge.encode()
     headers = {"sender": original["headers"]["sender"]  }
     return create_message("CHALLENGE", headers, data, reply=original["message_id"])
 

@@ -7,9 +7,9 @@ if __name__ == "__main__":
     program_type = input("Server(S)/Client(C)?:\n").upper()
     if program_type == "C":
         asyncio.run(main())
-    elif program_type =="S":
-        asyncio.run(run_server())
+    
     else:
+        asyncio.run(run_server())
         print("Invalid input.")
 
 

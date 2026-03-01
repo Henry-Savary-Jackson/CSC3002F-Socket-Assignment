@@ -2,7 +2,7 @@ import asyncio
 import base64
 from socket_assignment import unacked_messages
 from socket_assignment.utils.net import create_socket, send, udp_server
-from socket_assignment.utils.protocol import create_session_message , parse_headers
+from socket_assignment.utils.protocol import create_session_message , parse_headers, message_to_bytes, bytes_to_message
 
 server_connection = create_socket()
 server_adress = "localhost"
@@ -25,9 +25,10 @@ async def send_message(conn ,message, awaitable=True):
     # keep track of this message as not yet receiving a reply
     # schedule the sending of data to event-loop
     try :
+        print("sending message",message)
         if awaitable:
             unacked_messages[message["message_id"]] = {"message":message, "future":future}
-        await send(conn,message_to_text(message))
+        await send(conn,message_to_bytes(message))
         if future:
             return await future
     except Exception:
