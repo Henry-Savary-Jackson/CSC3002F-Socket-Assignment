@@ -9,6 +9,13 @@ import nacl
 from socket_assignment import users, connections,unacked_messages
 from socket_assignment.server import VALID_COMMANDS_PEER
 from socket_assignment.utils.protocol import create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message
+import socket
+import uuid
+import nacl.signing
+import nacl.encoding
+from socket_assignment.client import send_message
+from socket_assignment.utils.net import create_socket, connect, recv_message, close
+from socket_assignment.utils.protocol import create_message, create_authentication_message
 
 def generate_keypair():
     signing_key = nacl.signing.SigningKey.generate()
@@ -138,24 +145,6 @@ async def command_loop(conn, username):
         else:
             print("Unknown command")
 
-async def handle_message_as_client(conn, message):
-    if check_message_is_reply(conn, message):
-        return
-
-    conn_id = str(uuid.uuid4())
-    connections[conn_id] = {"connection": sock, "user_id": username}
-
-    if command == "INVITE":
-        chat_id = message["headers"]["chat_id"]
-        join_msg = create_join_message(message,chat_id)
-        reply = await send_message(conn, join_msg)
-        # groups.append({c})
-        reply["command"]
-        reply["headers"]
-
-        
-
-
 # handle connection 
 async def client_listener(conn_id):
     connection_info = connections[conn_id]
@@ -195,8 +184,5 @@ async def main():
     listener_task.cancel()
     close(sock)
     print("Disconnected")
-
-if __name__ == "__main__":
-    asyncio.run(main())
 
 
