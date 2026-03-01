@@ -15,7 +15,7 @@ def create_challenge():
     return base64.b64encode(random.randbytes(CHALLENGE_SIZE))
 
 def get_auth_token():
-    return base64.b64decode(random.randbytes(TOKEN_SIZE))
+    return base64.b64encode(random.randbytes(TOKEN_SIZE))
 
 async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
     headers = connect_msg["headers"]
@@ -65,7 +65,7 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
     verifier_key = nacl.signing.VerifyKey(user["public_key"], nacl.encoding.Base64Encoder)
     try :
         # verify signature
-        original = verifier_key.verify(base64.b64decode(data))
+        original = verifier_key.verify(data)
 
         #sucessfully veirified
         token = get_auth_token()
@@ -78,10 +78,10 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
         connections[connection_id] = {
             "connection":conn,
             "user_id":sender,
-            "token": base64.b64encode(token).decode()
+            "token": token.decode()
         } 
 
-        success_response = create_ack_message(authenticate_msg, token)
+        success_response = create_ack_message(authenticate_msg, token=token.decode())
         await send_message(conn, success_response, awaitable=False)
 
     except nacl.exceptions.BadSignatureError as e:

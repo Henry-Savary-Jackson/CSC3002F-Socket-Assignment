@@ -66,7 +66,10 @@ def check_message_is_reply(conn ,message):
 
         future = unacked_messages[reply_to_id]["future"]
         future.set_result(message)
-        del unacked_messages[message_id]
+        unacked_messages.pop(reply_to_id)
+        return True
+
+    return False
 
 async def authenticate(conn, username, signing_key, verify_key):
     public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
@@ -78,6 +81,7 @@ async def authenticate(conn, username, signing_key, verify_key):
         "udp_port": "1"
     })
     challenge_msg = await send_message(conn, connect_msg, awaitable=True)
+    print("Received challenge",challenge_msg)
     if challenge_msg["command"] != "CHALLENGE":
         print("Expected CHALLENGE, got", challenge_msg["command"])
         return False
@@ -152,7 +156,7 @@ async def client_listener(conn_id):
     try:
         async for message in recv_message(conn):
             try :
-                await handle_message_as_client(conn, message)
+                check_message_is_reply(conn, message)
             except Exception as e:
                 print(e)
     except ConnectionError as e:
@@ -174,11 +178,14 @@ async def main():
     await loop.sock_connect(sock, (server_host, server_port))
     print(f"Connected to server {server_host}:{server_port}")
 
+    connections["server"] = {"connection":sock }
+
+    listener_task = asyncio.create_task(client_listener("server"))
+
     success = await authenticate(sock, username, signing_key, verify_key)
     if not success:
         close(sock)
  
-    listener_task = asyncio.create_task(client_listener(conn_id))
     await command_loop(sock, username)
 
     listener_task.cancel()

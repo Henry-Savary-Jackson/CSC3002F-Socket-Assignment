@@ -17,9 +17,7 @@ async def recvall(conn):
         if length_data is None:
             break
         length = int.from_bytes(length_data, byteorder="big")
-        print(length)
         data =   await recv(conn ,length)
-        print(length_data+data )
         if data is None:
             break
         yield data
@@ -58,7 +56,7 @@ async def recv(conn, n):
         
 
 async def send(conn,data):
-    print(data)
+    print("Sending...")
     await asyncio.get_event_loop().sock_sendall(conn, data)
 
 def udp_server():
@@ -67,4 +65,4 @@ def udp_server():
     return sock
 
 async def recv_udp(sock):
-    await asyncio.get_running_loop().sock_recvfrom(sock, BUF_SIZE )
+    await asyncio.get_event_loop().sock_recvfrom(sock, BUF_SIZE )

@@ -109,8 +109,7 @@ async def handle_new_conn(conn):
     global active_connections
     try:
         async for message in recv_message(conn):
-            print(message)
-            await handle_message_main_server(conn, message)
+            asyncio.create_task(handle_message_main_server(conn, message))
     except (ConnectionError, BlockingIOError) as e:
         print(f"Connection error: {e}")
     finally:
@@ -126,25 +125,32 @@ async def handle_new_conn(conn):
         close(conn)
 
 async def run_server(host='localhost', port=5000):
+    
     global active_connections
     sock = create_socket()
-    sock.bind((host, port))
-    sock.listen(100)
-    sock.setblocking(False)
-    print(f"Server listening on {host}:{port}")
+    try :
+        sock.bind((host, port))
+        sock.listen(100)
+        sock.setblocking(False)
+        print(f"Server listening on {host}:{port}")
 
-    async for conn, addr in get_connections(sock):
-        if active_connections >= MAX_CONNECTIONS:
-            print(f"Rejected connection from {addr}: max connections reached")
-            try:
-                await asyncio.get_running_loop().sock_sendall(conn, b"Server full\n")
-            except:
-                pass
-            close(conn)
-            continue
-        active_connections += 1
-        print(f"New connection from {addr}, active: {active_connections}")
-        asyncio.create_task(handle_new_conn(conn))
+        async for conn, addr in get_connections(sock):
+            if active_connections >= MAX_CONNECTIONS:
+                print(f"Rejected connection from {addr}: max connections reached")
+                try:
+                    await asyncio.get_running_loop().sock_sendall(conn, b"Server full\n")
+                except:
+                    pass
+                close(conn)
+                continue
+            active_connections += 1
+            print(f"New connection from {addr}, active: {active_connections}")
+            asyncio.create_task(handle_new_conn(conn))
+        
+    except Exception as e:
+        sock.close()
+    except InterruptedError as e:
+        sock.close()
 
 if __name__ == "__main__":
     import sys

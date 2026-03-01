@@ -25,7 +25,6 @@ async def send_message(conn ,message, awaitable=True):
     # keep track of this message as not yet receiving a reply
     # schedule the sending of data to event-loop
     try :
-        print("sending message",message)
         if awaitable:
             unacked_messages[message["message_id"]] = {"message":message, "future":future}
         await send(conn,message_to_bytes(message))

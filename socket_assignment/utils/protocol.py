@@ -110,7 +110,7 @@ def create_session_message(other_user,current_user, token):
 
 def create_challenge_message(original,challenge):
     headers = {"sender": original["headers"]["sender"]  }
-    return create_message("CHALLENGE", headers, data, reply=original["message_id"])
+    return create_message("CHALLENGE", headers, challenge, reply=original["message_id"])
 
 def create_authentication_message(challenge_msg,private_key:SigningKey, sender):
     signature = private_key.sign(challenge_msg)
@@ -121,8 +121,8 @@ def create_ack_message(original_message, **kwargs):
     return create_message("ACK",  reply=original_message["message_id"], **kwargs)
 
 def create_error_message(original, cause):
-    headers = {"explanation":cause}
-    return create_message("ERROR", headers, data)
+    headers = {"cause":cause, REPLY_HEADER_NAME:original["message_id"]}
+    return create_message("ERROR", headers)
 
 def create_join_message(original, chat_id):
     return create_message("JOIN", {})
