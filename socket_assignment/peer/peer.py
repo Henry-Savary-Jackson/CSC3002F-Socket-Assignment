@@ -2,14 +2,39 @@
 # randomly choose ip, port
 
 import socket
+import base64
+from uuid import uuid4
 import asyncio
-from socket_assignment.utils.exceptions import server_excpetions_handled
+from socket_assignment.utils.exceptions import server_excpetions_handled, ServerError
+from socket_assignment.storage import add_new_media
 from socket_assignment.utils.net import create_socket ,get_connections, send, recvall, close, recv_message
 from socket_assignment.client import users, unacked_messages, send_message
 from socket_assignment.client.client import send_session, check_message_is_reply 
-from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message
+from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message, create_download_response_tcp
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
-from socket_assignment import connections
+from socket_assignment import connections, media
+
+
+async def handle_direct_message_peer(conn ,message):
+   headers = message["headers"]
+   reply_data = None
+   if (mimetype == "text/plain"):
+      print(f"New message {data.decode()}")
+   else:
+      if "filename" not in headers:
+         raise ServerError(conn, message, "Must give a filename in headers.")
+      if "mimetype" not in headers:
+         raise ServerError(conn, message, "Must give a mimetype in headers.")
+      mimetype = headers["mimetype"]
+      filename = headers["filename"]
+      media_id = add_new_media(data, filename,mimetype)
+      reply_data = media_id.encode()
+
+   ack_msg = create_ack_message(message, data=reply_data)
+   await send_message(conn, ack_msg, awaitable=False)
+
+
+
 
 @server_excpetions_handled
 async def handle_message_peer(conn,message):
@@ -31,31 +56,28 @@ async def handle_message_peer(conn,message):
       await authentication_flow_server(conn, message, server_type="PEER")
       
    elif command == "MESSAGE":
-      mimetype = headers["mimetype"]
-      ack_msg = create_ack_message(message)
-      send_message(conn, ack_msg, awaitable=False)
-      if (mimetype == "text/plain"):
-         print(data.decode())
-      else:
-         print("File")
-
+      await handle_direct_message_peer(conn, message)
+      
    elif command == "DOWNLOAD":
+      if "media_id" not in headers:
+         raise ServerError(conn, message, "Must specify media_id to download!")
+
       media_id = headers["media_id"]
       if "stream" in headers and headers["stream"]:
-         # handle streaming
-         pass 
+         # TODO: handle streaming
+         await send_message(conn, create_ack_message(message),awaitable=False)
       else:
-         pass
+         if media_id not in media:
+            raise ServerError(conn, message, "Media doesn't exist.")
+         response =  create_download_response_tcp(messgae, media[media_id]) 
+         await send_message(conn, response,awaitable=False)
+
    elif command == "DISCONNECT":
       close(conn) 
 
 
 # any Server exceptions thrown will be handled and send an error message back to the client
-async def listen_peer(conn_id):
-   conn = connections[conn_id]["connection"]
-
-   assert conn
-
+async def listen_peer(conn):
    try:
       async for message in recv_message(conn):
          # is this method

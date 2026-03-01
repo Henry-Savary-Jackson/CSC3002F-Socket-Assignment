@@ -1,14 +1,16 @@
 import asyncio
 import base64
-from socket_assignment.utils.net import create_socket, send
+from socket_assignment.utils.net import create_socket, send, udp_server
 from socket_assignment.utils.protocol import create_socket, create_session_message , parse_headers
 
 server_connection = create_socket()
 server_adress = "localhost"
 
+udp_socket = udp_server()
+
 client_username =None 
-client_public_key_bytes = None
-client_private_key_bytes = None
+client_public_key_b64 = None
+client_private_key_b64 = None
 
 async def send_message(conn ,message, awaitable=True):
     """Given a socket, send this message to this socket
@@ -25,7 +27,8 @@ async def send_message(conn ,message, awaitable=True):
         if awaitable:
             unacked_messages[message["message_id"]] = {"message":message, "future":future}
         await send(conn,message_to_text(message))
-        return future
+        if future:
+            return await future
     except Exception:
         if awaitable:
             unacked_messages.pop(message["message_id"])
@@ -43,7 +46,7 @@ async def send_session(username):
     response_message = await send_message(connection_info["connection"], message)
 
     # get the info from message body
-    info = parse_headers(base64.b64decode(response_message["data"].decode().split()))
+    info = parse_headers(response_message["data"].decode().split())
 
     if username in users:
         # update this user with this information

@@ -84,7 +84,10 @@ async def client_listener(conn_id):
     conn = connection_info["connection"] 
     try:
         async for message in recv_message(conn):
-            await handle_message_as_client(conn, message)
+            try :
+                await handle_message_as_client(conn, message)
+            except Exception as e:
+                print(e)
     except ConnectionError as e:
       print(f"Error:{e}") 
     except BlockingIOError as be:

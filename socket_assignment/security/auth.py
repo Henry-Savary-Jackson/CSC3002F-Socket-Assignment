@@ -1,11 +1,11 @@
 
 import random
 from uuid import uuid4
-import nacl
+import nacl 
 import base64
 from socket_assignment import users, connections
-from socket_assignment.client import send_session, send_message
-from socket_assignment.utils.protocol import create_challenge_message , create_session_message, create_ack_message, create_error_message
+from socket_assignment.client import send_session, send_message, client_public_key_b64, client_private_key_b64
+from socket_assignment.utils.protocol import create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
 
 CHALLENGE_SIZE = 128
@@ -33,7 +33,9 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
 
         port = int(headers["port"])
 
-        users[sender] = { "public_key":public_key_b64, "username":sender, "ip": ip, "port":port}
+        udp_port = int(headers["udp_port"])
+
+        users[sender] = { "public_key":public_key_b64, "username":sender, "ip": ip, "port":port, "udp_port":udp_port}
         # get from server
 
         # create new user
@@ -76,7 +78,7 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
         connections[connection_id] = {
             "connection":conn,
             "user_id":sender,
-            "token": base64.b64encode(token)
+            "token": base64.b64encode(token).decode()
         } 
 
         success_response = create_ack_message(authenticate_msg, token)
@@ -86,5 +88,32 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
         print("Bad signature, failed!")
         raise ServerError(conn, authenticate_msg, "Invalid Signature!")
 
+
+async def create_keypair():
+    signing_key = nacl.signing.SigningKey.generate()
+    private_key = signing_key.encode(nacl.encoding.Base64Encoder)
+    public_key = signing_key.verify_key.encode(nacl.encoding.Base64Encoder)
+    return private_key, public_key
         
+    
+async def authentication_flow_client(conn_id,conn,username, ip, port_tcp, port_udp, private_key, public_key=None ):
+    connect_msg = create_connect_message(username, ip=ip, tcp_port=port_tcp, udp_port=port_udp, public_key=public_key)
+    reply = await send_message(conn, connect_msg)
+    if reply["command"] == "ERROR":
+        raise Exception(f"Failed to connect:{resp_cmd["headers"]["cause"]}")
+    challenge_msg = reply
+
+    signing_key = nacl.signing.SigningKey(private_key, nacl.encoding.Base64Encoder)
+
+    auth_msg = create_authentication_message(challenge_msg, signing_key) 
+
+    response = await send_message(conn, auth_msg)
+
+    resp_cmd = response["command"] 
+    if resp_cmd == "ACK":
+        token = base64.b64decode(response["data"]).decode()
+        connections[conn_id] = {"connection":conn,"token":token}
+    elif resp_cmd == "ERROR":
+        raise Exception(f"Failed to connect:{resp_cmd["headers"]["cause"]}")
+
     

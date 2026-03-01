@@ -53,4 +53,10 @@ async def recv(conn, n):
 async def send(conn,data:str):
     await asyncio.get_running_loop().sock_sendall(conn, data)
 
+def udp_server():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+    return sock
 
+async def recv_udp(sock):
+    await asyncio.get_running_loop().sock_recvfrom(sock, BUF_SIZE )

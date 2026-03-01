@@ -91,6 +91,17 @@ def bytes_to_message(data_bytes):
     command, headers, data = parse(data_bytes) 
     return {"message_id":headers[MESSAGE_ID_HEADER_NAME], "headers":headers, "data":data, "command":command}
 
+def create_connect_message(sender, public_key=None, ip=None, tcp_port=None,udp_port=None):
+    headers = {"sender":sender}
+    if ip:
+        headers["ip"] = ip
+    if tcp_port:
+        headers["port"] = tcp_port
+    if udp_port:
+        headers["udp_port"] = udp_port
+    if public_key:
+        headers["public_key"] = public_key
+    return create_message("CONNECT", headers) 
 
 def create_session_message(other_user,current_user, token):
     headers = {"sender":current_user, "other":other_user}
@@ -106,8 +117,8 @@ def create_authentication_message(challenge_msg,private_key:nacl.signing.Signing
     headers = {"sender":sender}
     return create_message("AUTHENTICATE", headers, signature, reply=challenge_msg["message_id"])
 
-def create_ack_message(original_message, data=None):
-    return create_message("ACK", data=data)
+def create_ack_message(original_message, **kwargs):
+    return create_message("ACK",  reply=original_message["message_id"], **kwargs)
 
 def create_error_message(original, cause):
     headers = {"explanation":cause}
@@ -115,3 +126,8 @@ def create_error_message(original, cause):
 
 def create_join_message(original, chat_id):
     return create_message("JOIN", {})
+
+def create_download_response_tcp(original, media):
+    data = base64.b64decode(media["data"])
+    headers = {"content_length" :len(data), "mimetype":media["mimetype"], "filename":media["filename"]}
+    return create_ack_message(original, data=data,headers=headers)
