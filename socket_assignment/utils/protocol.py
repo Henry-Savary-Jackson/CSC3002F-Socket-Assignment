@@ -124,10 +124,14 @@ def create_error_message(original, cause):
     headers = {"cause":cause, REPLY_HEADER_NAME:original["message_id"]}
     return create_message("ERROR", headers)
 
-def create_join_message(original, chat_id):
-    return create_message("JOIN", {})
+def create_join_message(original,username, chat_id):
+    return create_message("JOIN", {"sender":username, "chat_id":chat_id}, reply=original["message_id"])
 
 def create_download_response_tcp(original, media):
     data = base64.b64decode(media["data"])
     headers = {"content_length" :len(data), "mimetype":media["mimetype"], "filename":media["filename"]}
     return create_ack_message(original, data=data,headers=headers)
+
+
+def create_invite_message(sender,other_username, chat_id,token):
+    return create_message("INVITE", {"sender":sender,"chat_id":chat_id, "other":other_username}, token=token ) 

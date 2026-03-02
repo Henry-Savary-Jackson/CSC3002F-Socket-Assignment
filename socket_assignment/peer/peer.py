@@ -3,6 +3,7 @@
 
 import socket
 import base64
+from socket_assignment.peer import peer_tcp_port
 from uuid import uuid4
 import asyncio
 from socket_assignment.utils.exceptions import server_excpetions_handled, ServerError
@@ -13,6 +14,7 @@ from socket_assignment.client.client import send_session, check_message_is_reply
 from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message, create_download_response_tcp
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
 from socket_assignment import connections, media
+from socket_assignment.server import handle_download_server, disconnect_server
 
 
 async def handle_direct_message_peer(conn ,message):
@@ -35,11 +37,15 @@ async def handle_direct_message_peer(conn ,message):
 
 
 
-
 @server_excpetions_handled
-async def handle_message_peer(conn,message):
+async def handle_message_peer(conn_id,message):
    # check if this is just a reply to a previous message, in which case
    # dont bother handling it, it will be handled anyway
+
+   assert conn_id in connections
+
+   conn = connections[conn_id]["connection"]
+
    if check_message_is_reply(conn, message):
       return
 
@@ -59,29 +65,20 @@ async def handle_message_peer(conn,message):
       await handle_direct_message_peer(conn, message)
       
    elif command == "DOWNLOAD":
-      if "media_id" not in headers:
-         raise ServerError(conn, message, "Must specify media_id to download!")
-
-      media_id = headers["media_id"]
-      if "stream" in headers and headers["stream"]:
-         # TODO: handle streaming
-         await send_message(conn, create_ack_message(message),awaitable=False)
-      else:
-         if media_id not in media:
-            raise ServerError(conn, message, "Media doesn't exist.")
-         response =  create_download_response_tcp(messgae, media[media_id]) 
-         await send_message(conn, response,awaitable=False)
+      await handle_download_server(conn, server) 
 
    elif command == "DISCONNECT":
-      close(conn) 
+      # delete connections
+      disconnect_server(conn_id)
 
 
 # any Server exceptions thrown will be handled and send an error message back to the client
-async def listen_peer(conn):
+async def listen_peer(conn_id):
+   conn = connections[conn_id]["connection"]
    try:
       async for message in recv_message(conn):
          # is this method
-         await handle_message_peer(conn, message) 
+         await handle_message_peer(conn_id, message) 
    except ConnectionError as e:
       print(f"Error:{e}") 
    except BlockingIOError as be:
@@ -92,10 +89,13 @@ async def listen_peer(conn):
 
 
 
-async def run_peer(port):
+async def run_peer():
+   global peer_tcp_port
    sock = create_socket()
-   sock.bind(("0.0.0.0", port))
+   sock.bind(("0.0.0.0", peer_tcp_port))
    sock.listen(100)
 
    async for conn, addr in get_connections(sock):
-      asyncio.create_task(listen_peer(conn))
+      conn_id = str(uuid4())
+      connections[conn_id] = { "connection":conn} 
+      asyncio.create_task(listen_peer(conn_id))

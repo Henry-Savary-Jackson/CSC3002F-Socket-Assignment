@@ -1,7 +1,38 @@
+from socket_assignment.utils.net import close
+from socket_assignment import connections , users
 
 VALID_COMMANDS_SERVER = ["CONNECT", "AUTHENTICATE", "ACK", "MESSAGE", "DOWNLOAD", "SESSION"]
 VALID_COMMANDS_PEER = [""]
 
-
+MAX_CONNECTIONS = 100
 
 group_chats = dict()
+
+async def handle_download_server(conn,message):
+    headers = message["headers"]
+    if "media_id" not in headers:
+        raise ServerError(conn, message, "Must specify media_id to download!")
+
+    media_id = headers["media_id"]
+    if "stream" in headers and headers["stream"]:
+        # TODO: handle streaming
+        await send_message(conn, create_ack_message(message),awaitable=False)
+    else:
+        if media_id not in media:
+            raise ServerError(conn, message, "Media doesn't exist.")
+        response =  create_download_response_tcp(messgae, media[media_id]) 
+        await send_message(conn, response,awaitable=False)
+
+
+async def handle_chat_message_server(conn ,message):
+    pass
+
+
+async def disconnect_server(conn_id):
+    connection_info = connections[conn_id]
+    socket = connection_info["connection"]
+    user_id = connection_info["user_id"] if "user_id" in connection_info else None
+    if user_id:
+        users[user_id].pop("connection_id")
+    connections.pop(conn_id)
+    close(socket)

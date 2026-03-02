@@ -17,7 +17,10 @@ def create_challenge():
 def get_auth_token():
     return base64.b64encode(random.randbytes(TOKEN_SIZE))
 
-async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
+async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
+    
+    conn = connections[conn_id]["connection"]
+
     headers = connect_msg["headers"]
     assert "sender" in headers 
     sender = headers["sender"]
@@ -70,16 +73,15 @@ async def authentication_flow_server(conn,connect_msg, server_type="SERVER"):
         #sucessfully veirified
         token = get_auth_token()
         # create connection object
-        connection_id = uuid4()
 
-        user["connection_id"] = connection_id  # link the user to its connections
+        user["connection_id"] = conn_id  # link the user to its connections
         
         # store info about this connection in order to be used later
-        connections[connection_id] = {
-            "connection":conn,
+        connections[conn_id].update({
             "user_id":sender,
             "token": token.decode()
-        } 
+
+        })
 
         success_response = create_ack_message(authenticate_msg, token=token.decode())
         await send_message(conn, success_response, awaitable=False)
@@ -95,25 +97,6 @@ async def create_keypair():
     public_key = signing_key.verify_key.encode(nacl.encoding.Base64Encoder)
     return private_key, public_key
         
-    
-async def authentication_flow_client(conn_id,conn,username, ip, port_tcp, port_udp, private_key, public_key=None ):
-    connect_msg = create_connect_message(username, ip=ip, tcp_port=port_tcp, udp_port=port_udp, public_key=public_key)
-    reply = await send_message(conn, connect_msg)
-    if reply["command"] == "ERROR":
-        raise Exception(f"Failed to connect:{resp_cmd["headers"]["cause"]}")
-    challenge_msg = reply
 
-    signing_key = nacl.signing.SigningKey(private_key, nacl.encoding.Base64Encoder)
-
-    auth_msg = create_authentication_message(challenge_msg, signing_key) 
-
-    response = await send_message(conn, auth_msg)
-
-    resp_cmd = response["command"] 
-    if resp_cmd == "ACK":
-        token = base64.b64decode(response["data"]).decode()
-        connections[conn_id] = {"connection":conn,"token":token}
-    elif resp_cmd == "ERROR":
-        raise Exception(f"Failed to connect:{resp_cmd["headers"]["cause"]}")
 
     
