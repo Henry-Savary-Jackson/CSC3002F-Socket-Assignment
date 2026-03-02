@@ -1,9 +1,10 @@
 import asyncio
 import base64
 import random
-from socket_assignment import unacked_messages
+from socket_assignment import unacked_messages, connections
 from socket_assignment.utils.net import create_socket, send, udp_server
 from socket_assignment.utils.protocol import create_session_message , parse_headers, message_to_bytes, bytes_to_message
+from socket_assignment.storage import store_message_in_chat
 
 server_connection = create_socket()
 server_adress = "localhost"
@@ -18,8 +19,8 @@ client_private_key_b64 = None
 
 client_chats = dict()
 
-
 pending_invites = []
+
 
 async def send_message(conn ,message, awaitable=True):
     """Given a socket, send this message to this socket
@@ -67,5 +68,4 @@ async def send_session(username):
         users[username] = info.copy()
         users["pending_messages"] = []
     return info["ip"], info["port"], info["public_key"] 
-
 

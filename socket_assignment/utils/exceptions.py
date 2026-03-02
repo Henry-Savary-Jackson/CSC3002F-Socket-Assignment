@@ -13,7 +13,7 @@ class ServerError(Exception):
         self.original_message= original_message
 
 
-def server_excpetions_handled(func):
+def server_exceptions_handled(func):
     """Catches ServerError thrown by func, and sends an appropriate error message back to the client.
     You only use this on a function used to handle message on the central server or on the peer.
     If a client experiences an error, they would just print to console."""

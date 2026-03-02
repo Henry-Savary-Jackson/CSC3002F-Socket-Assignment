@@ -128,7 +128,7 @@ def create_join_message(original,username, chat_id):
     return create_message("JOIN", {"sender":username, "chat_id":chat_id}, reply=original["message_id"])
 
 def create_download_response_tcp(original, media):
-    data = base64.b64decode(media["data"])
+    data = base64.b64decode(media["data"].encode())
     headers = {"content_length" :len(data), "mimetype":media["mimetype"], "filename":media["filename"]}
     return create_ack_message(original, data=data,headers=headers)
 

@@ -5,7 +5,7 @@ from socket_assignment.server import group_chats, handle_download_server, MAX_CO
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
 from socket_assignment.utils.protocol import create_message, create_ack_message, create_error_message, AUTH_TOKEN_HEADER_NAME
 from socket_assignment.security.auth import authentication_flow_server
-from socket_assignment.utils.exceptions import server_excpetions_handled
+from socket_assignment.utils.exceptions import server_exceptions_handled
 from socket_assignment.client import send_message
 from socket_assignment.client.client import check_message_is_reply
 
@@ -14,7 +14,7 @@ async def send_error(conn, original_msg, explanation):
     error_msg = create_error_message(original_msg, explanation)
     await send_message(conn, error_msg, awaitable=False)
 
-@server_excpetions_handled
+@server_exceptions_handled
 async def handle_message_main_server(conn_id, message):
     assert conn_id in connections
     conn = connections[conn_id]

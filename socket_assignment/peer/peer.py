@@ -6,10 +6,10 @@ import base64
 from socket_assignment.peer import peer_tcp_port
 from uuid import uuid4
 import asyncio
-from socket_assignment.utils.exceptions import server_excpetions_handled, ServerError
-from socket_assignment.storage import add_new_media
+from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
+from socket_assignment.storage import add_new_media, store_message_in_chat
 from socket_assignment.utils.net import create_socket ,get_connections, send, recvall, close, recv_message
-from socket_assignment.client import users, unacked_messages, send_message
+from socket_assignment.client import users, unacked_messages, send_message, client_chats
 from socket_assignment.client.client import send_session, check_message_is_reply 
 from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message, create_download_response_tcp
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
@@ -20,13 +20,27 @@ from socket_assignment.server import handle_download_server, disconnect_server, 
 async def handle_direct_message_peer(conn ,message):
    headers = message["headers"]
    reply_data = None
+   if "sender" not in headers:
+      raise ServerError(conn, message, "Missing sender header in MESSAGE frame!")
+   
+   if "data" not in message or not message["data"]:
+      raise ServerError(conn, message, "Missing data MESSAGE frame!")
+
+   if "mimetype" not in headers:
+      raise ServerError(conn, message, "Must give a mimetype in headers.")
+
+   sender = headers["sender"]
+   data = message["data"]
+   mimetype = headers["mimetype"]
+
+   store_message_in_chat(sender, message, client_chats)
+
+
    if (mimetype == "text/plain"):
-      print(f"New message {data.decode()}")
+      print(f"New message!: {data.decode()}")
    else:
       if "filename" not in headers:
          raise ServerError(conn, message, "Must give a filename in headers.")
-      if "mimetype" not in headers:
-         raise ServerError(conn, message, "Must give a mimetype in headers.")
       mimetype = headers["mimetype"]
       filename = headers["filename"]
       media_id = add_new_media(data, filename,mimetype)
@@ -37,7 +51,7 @@ async def handle_direct_message_peer(conn ,message):
 
 
 
-@server_excpetions_handled
+@server_exceptions_handled
 async def handle_message_peer(conn_id,message):
    # check if this is just a reply to a previous message, in which case
    # dont bother handling it, it will be handled anyway

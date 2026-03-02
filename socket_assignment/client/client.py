@@ -2,13 +2,14 @@ import asyncio
 
 import socket
 from socket_assignment.peer import  peer_tcp_port
-import uuid
+from uuid import uuid4
 import asyncio
-from socket_assignment.client import  send_message,client_username, server_connection  , udp_socket, udp_port, client_chats
+from socket_assignment.client import handle_message_as_client, send_message,client_username, server_connection  , udp_socket, udp_port, client_chats
 from socket_assignment.utils.net import send, recv_message
 import nacl
 from socket_assignment import users, connections,unacked_messages
 from socket_assignment.utils.protocol import create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
+from socket_assignment.utils.exceptions import server_exceptions_handled
 import socket
 import uuid
 import nacl.signing
@@ -22,8 +23,21 @@ def generate_keypair():
     verify_key = signing_key.verify_key
     return signing_key, verify_key
 
+@server_excpetions_handled
+async def handle_message_as_client(conn_id, message):
+    conn_info = connections[conn_id]
+    conn = conn_info["connection"] 
 
-
+    cmd = message["command"]
+    headers = message["headers"]
+    if cmd == "MESSAGE":
+        if "chat_id" not in headers:
+            raise ServerError(conn, message, "chat_id is missing")
+        chat_id = headers["chat_id"] 
+        store_message_in_chat(chat_id, message, client_chats) 
+    elif cmd == "INVITE":
+        print("New invite!")
+        pending_invites.append(message)
 
 
 def check_message_is_reply(conn ,message):
@@ -72,9 +86,33 @@ async def authenticate(conn_id, username, signing_key, verify_key, peer_tcp_port
         print("Authentication failed")
         return False
 
+
+async def connect_to_peer(username, client_username, signing_key,verify_key,):
+    assert username in users
+
+    peer_sock = create_socket()
+
+    user_info = users[username]
+
+    assert "ip" in user_info
+    assert "port" in user_info
+    assert "udp_port" in user_info
+
+
+    tcp_port = user_info["port"]
+    udp = udp_port["port"]
+
+
+    await connect(peer_sock, user_info["ip"], user_info["port"])
+    conn_id  = str(uuid4())
+    connections[conn_id] = { "connection": co, "user_id": username}
+    result = await authenticate(conn_id, client_username,signing_key, verify_key,  )
+
+    # start listening as a peer on this new socket
+
 async def command_loop(conn_id, username):
     conn = connections[conn_id] 
-    
+
     while True:
         cmd = await asyncio.get_event_loop().run_in_executor(None, input, "Enter command: ")
         parts = cmd.split()
@@ -120,6 +158,7 @@ async def command_loop(conn_id, username):
         elif parts[0] == "/msg":
             if len(parts) < 3:
                 print("Usage: /msg <chat_id> ")
+                input("")
                 continue
         elif parts[0] == "/dmsg":
             if len(parts) < 3:
@@ -140,7 +179,10 @@ async def client_listener(conn_id):
     try:
         async for message in recv_message(conn):
             try :
-                check_message_is_reply(conn, message)
+                if check_message_is_reply(conn, message):
+                    continue 
+                asyncio.create_task(handle_message_as_client(conn_id, message))
+                
             except Exception as e:
                 print(e)
     except ConnectionError as e:
@@ -167,7 +209,7 @@ async def run_client():
 
     connections[server_conn_id] = {"connection":sock }
 
-    listener_task = asyncio.create_task(client_listener("server"))
+    listener_task = asyncio.create_task(client_listener(server_conn_id))
 
     bind_server(udp_socket, udp_port)
 

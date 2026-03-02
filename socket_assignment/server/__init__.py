@@ -1,4 +1,5 @@
 from socket_assignment.utils.net import close, async_udp_client
+import base64
 from socket_assignment import connections , users
 from socket_assignment.utils.exceptions import ServerError
 from socket_assignment.utils.protocol import create_download_response_tcp, create_ack_message
@@ -31,6 +32,7 @@ async def handle_download_server(conn,message):
     media_id = headers["media_id"]
     if media_id not in media:
         raise ServerError(conn, message, "Media doesn't exist.")
+    file_data = base64.b64decode(media[media_id]["data"].encode())
     if "stream" in headers and headers["stream"]:
         # TODO: handle streaming
         # create ack messages for each chunk of data
@@ -42,7 +44,6 @@ async def handle_download_server(conn,message):
         ip = user_info["ip"] 
         assert "udp_port" in user_info
         udp_port = user_info["udp_port"]
-        file_data = media[media_id]["data"]
         udp_sock = async_udp_client()
         index = 0
         chunk_num = 0 
