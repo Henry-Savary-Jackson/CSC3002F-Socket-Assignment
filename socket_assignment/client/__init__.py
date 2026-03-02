@@ -11,7 +11,7 @@ server_adress = "localhost"
 
 udp_port =random.randrange(9000)
 
-udp_socket = udp_server(udp_port)
+udp_socket = udp_server()
 
 client_username =None 
 client_public_key_b64 = None

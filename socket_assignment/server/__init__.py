@@ -24,7 +24,9 @@ def check_if_token_is_valid(conn_id, message, user_id):
     if msg_token != true_token:
         raise ServerError(conn_info["connection"], message, "Wrong authentication token!")
 
-async def handle_download_server(conn,message):
+async def handle_download_server(conn_id,message):
+    conn = connections[conn_id]["connection"]
+
     headers = message["headers"]
     if "media_id" not in headers:
         raise ServerError(conn, message, "Must specify media_id to download!")

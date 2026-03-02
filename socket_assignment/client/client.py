@@ -4,7 +4,7 @@ import socket
 from socket_assignment.peer import  peer_tcp_port
 from uuid import uuid4
 import asyncio
-from socket_assignment.client import handle_message_as_client, send_message,client_username, server_connection  , udp_socket, udp_port, client_chats
+from socket_assignment.client import  send_message,client_username, server_connection  , udp_socket, udp_port, client_chats
 from socket_assignment.utils.net import send, recv_message
 import nacl
 from socket_assignment import users, connections,unacked_messages
@@ -15,6 +15,7 @@ import uuid
 import nacl.signing
 import nacl.encoding
 from socket_assignment.client import send_message
+from socket_assignment.utils.exceptions import  server_exceptions_handled 
 from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_server
 from socket_assignment.utils.protocol import create_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
 
@@ -23,7 +24,7 @@ def generate_keypair():
     verify_key = signing_key.verify_key
     return signing_key, verify_key
 
-@server_excpetions_handled
+@server_exceptions_handled
 async def handle_message_as_client(conn_id, message):
     conn_info = connections[conn_id]
     conn = conn_info["connection"] 
@@ -57,7 +58,7 @@ def check_message_is_reply(conn ,message):
     return False
 
 async def authenticate(conn_id, username, signing_key, verify_key, peer_tcp_port, udp_port):
-    conn = connections[conn_id]
+    conn = connections[conn_id]["connection"]
     public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
     connect_msg = create_message("CONNECT", headers={
         "sender": username,
@@ -79,7 +80,7 @@ async def authenticate(conn_id, username, signing_key, verify_key, peer_tcp_port
     if ack["command"] == "ACK":
 
         token = ack["headers"][AUTH_TOKEN_HEADER_NAME]
-        connections["client_token"]  = token
+        connections[conn_id]["client_token"]  = token
         print("Authentication successful")
         return True
     else:
@@ -105,13 +106,13 @@ async def connect_to_peer(username, client_username, signing_key,verify_key,):
 
     await connect(peer_sock, user_info["ip"], user_info["port"])
     conn_id  = str(uuid4())
-    connections[conn_id] = { "connection": co, "user_id": username}
+    connections[conn_id] = { "connection": peer_sock, "user_id": username}
     result = await authenticate(conn_id, client_username,signing_key, verify_key,  )
 
     # start listening as a peer on this new socket
 
 async def command_loop(conn_id, username):
-    conn = connections[conn_id] 
+    conn = connections[conn_id]["connection"]
 
     while True:
         cmd = await asyncio.get_event_loop().run_in_executor(None, input, "Enter command: ")

@@ -1,4 +1,5 @@
 import asyncio
+from uuid import uuid4
 import socket
 from socket_assignment import users, connections, unacked_messages
 from socket_assignment.server import group_chats, handle_download_server, MAX_CONNECTIONS, handle_chat_message_server, disconnect_server
@@ -17,17 +18,17 @@ async def send_error(conn, original_msg, explanation):
 @server_exceptions_handled
 async def handle_message_main_server(conn_id, message):
     assert conn_id in connections
-    conn = connections[conn_id]
+    conn = connections[conn_id]["connection"]
     if check_message_is_reply(conn, message):
         return
 
     command = message["command"]
     if command == "CONNECT":
-        await authentication_flow_server(conn, message)
+        await authentication_flow_server(conn_id, message)
     elif command == "DOWNLOAD":
-        await handle_download_server(conn, message)
+        await handle_download_server(conn_id, message)
     elif command == "MESSAGE":
-        await handle_chat_message_server(conn, message)
+        await handle_chat_message_server(conn_id, message)
     elif command == "INVITE":
         headers = message.get("headers", {})
         target = headers.get("target")
@@ -93,7 +94,7 @@ async def handle_message_main_server(conn_id, message):
 
 async def handle_new_conn(conn_id):
     assert conn_id in connections
-    conn = connections[conn_id]
+    conn = connections[conn_id]["connection"]
     try:
         async for message in recv_message(conn):
             asyncio.create_task(handle_message_main_server(conn_id, message))
@@ -101,7 +102,7 @@ async def handle_new_conn(conn_id):
         print(f"Connection error: {e}")
     finally:
         print(f"Done with {conn.getsockname()}")
-        disconnect_server(conn_id)
+        await disconnect_server(conn_id)
 
 async def run_server(host='localhost', port=5000):
     
@@ -127,8 +128,10 @@ async def run_server(host='localhost', port=5000):
             asyncio.create_task(handle_new_conn(conn_id))
         
     except Exception as e:
+        print(e)
         sock.close()
     except InterruptedError as e:
+        print(e)
         sock.close()
 
 if __name__ == "__main__":
