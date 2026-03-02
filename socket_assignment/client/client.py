@@ -1,5 +1,5 @@
 import asyncio
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, SOCK_DGRAM
 import uuid
 import asyncio
 from socket_assignment.client import  send_message,client_username, server_connection  
@@ -66,6 +66,9 @@ def check_message_is_reply(conn ,message):
         future = unacked_messages[reply_to_id]["future"]
         future.set_result(message)
         del unacked_messages[message_id]
+
+async def handle_message_as_client(conn, message):
+    check_message_is_reply(conn, message)
 
 async def authenticate(conn, username, signing_key, verify_key):
     public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
@@ -176,7 +179,9 @@ async def main():
     success = await authenticate(sock, username, signing_key, verify_key)
     if not success:
         close(sock)
+        return
  
+    conn_id = str(uuid.uuid4())
     listener_task = asyncio.create_task(client_listener(conn_id))
     await command_loop(sock, username)
 
