@@ -4,11 +4,10 @@ import socket
 from socket_assignment.peer import  peer_tcp_port
 import uuid
 import asyncio
-from socket_assignment.client import  send_message,client_username, server_connection  , udp_socket, udp_port
+from socket_assignment.client import  send_message,client_username, server_connection  , udp_socket, udp_port, client_chats
 from socket_assignment.utils.net import send, recv_message
 import nacl
 from socket_assignment import users, connections,unacked_messages
-from socket_assignment.server import VALID_COMMANDS_PEER
 from socket_assignment.utils.protocol import create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
 import socket
 import uuid
@@ -22,22 +21,6 @@ def generate_keypair():
     signing_key = nacl.signing.SigningKey.generate()
     verify_key = signing_key.verify_key
     return signing_key, verify_key
-
-
-async def async_tcp_client():
-    server_name = "localhost"
-    server_port = None
-    loop = asyncio.get_running_loop()
-    client_socket = socket(AF_INET, SOCK_STREAM)
-    client_socket.setblocking(False)
-    await loop.sock_connect(client_socket, (server_name, server_port))
-    username = input("Insert your username: ")
-    await loop.sock_sendall(client_socket, username.encode())
-    data = await loop.sock_recv(client_socket, 1024)
-    print("From Server:", data.decode())
-
-    client_socket.close()
-
 
 
 async def async_udp_client():
@@ -125,6 +108,7 @@ async def command_loop(conn, username):
             response = await send_message(conn, msg, awaitable=True)
             if response["command"] == "ACK":
                 print(f"Joined chat {chat_id}")
+                client_chats[chat_id] =  {"messages":[]}
             else:
                 print("Join failed")
         elif parts[0] == "/reject":
@@ -139,6 +123,16 @@ async def command_loop(conn, username):
             })
             await send_message(conn, msg, awaitable=False)
             print(f"Rejected invite for chat {chat_id}")
+
+        elif parts[0] == "/msg":
+            if len(parts) < 3:
+                print("Usage: /msg <chat_id> ")
+                continue
+        elif parts[0] == "/msg":
+            if len(parts) < 3:
+                print("Usage: /msg <chat_id> ")
+                continue
+
         elif parts[0] == "/quit":
             msg = create_message("DISCONNECT", headers={"sender": username})
             await send_message(conn, msg, awaitable=False)

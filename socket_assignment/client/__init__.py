@@ -17,6 +17,8 @@ client_username =None
 client_public_key_b64 = None
 client_private_key_b64 = None
 
+client_chats = dict()
+
 async def send_message(conn ,message, awaitable=True):
     """Given a socket, send this message to this socket
     
@@ -57,7 +59,8 @@ async def send_session(username):
         # update this user with this information
         users[username].update(info)
     else:
-        users[username] = info
+        users[username] = info.copy()
+        users["pending_messages"] = []
     return info["ip"], info["port"], info["public_key"] 
 
 

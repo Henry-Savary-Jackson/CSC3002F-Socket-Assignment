@@ -36,3 +36,19 @@ async def disconnect_server(conn_id):
         users[user_id].pop("connection_id")
     connections.pop(conn_id)
     close(socket)
+
+
+async def send_pending_messages(user_id):
+
+    user_info  = users[user_id]
+    if "connection_id" not in user_info:
+        return
+    conn_id = user_info["connection_id"]
+    if conn_id not in connections:
+        return 
+    assert "connection" in connections[conn_id]
+    conn = connections[conn_id]["connection"]
+    pending_messages  = user_info["pending_messages"] if "pending_messages" in user_info else []
+    while pending_messages:
+        message = pending_messages.pop(0)
+        await send_message(conn, message, awaitable=False) 
