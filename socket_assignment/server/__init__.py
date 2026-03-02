@@ -29,7 +29,7 @@ async def handle_download_server(conn,message):
         await send_message(conn, response,awaitable=False)
 
 
-async def handle_chat_message_server(conn ,message):
+async def handle_chat_message_server(_conn, _message):
     pass
 #add message to the group chat
 #for each member in group send message if they are online send the message to them except the sender if not pend the message until they come online
