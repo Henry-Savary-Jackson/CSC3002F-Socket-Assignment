@@ -1,3 +1,5 @@
+from email.mime import message
+
 from socket_assignment.utils.net import close
 from socket_assignment import connections , users
 from socket_assignment.utils.exceptions import ServerError
@@ -30,11 +32,23 @@ async def handle_download_server(conn,message):
 
 
 async def handle_chat_message_server(conn ,message):
-    pass
-#add message to the group chat
-#for each member in group send message if they are online send the message to them except the sender if not pend the message until they come online
-
-
+    #check if chat_id is specified
+    if "chat_id" not in message["headers"]:
+        raise ServerError(conn, message, "Chat id is not specified.")
+    group_id = message["headers"]["chat_id"]
+    sender = message["headers"]["sender"]
+    #send message to all members in the group except the sender
+    for user in group_chats[group_id]["members"]:
+        if user != sender:
+            #check if user is online
+            if "connection_id" in users[user]:
+                conn_id = users[user]["connection_id"]
+                await send_message(connections[conn_id]["connection"], message, awaitable=False)
+            else:
+                #user is offline, store message for later delivery
+                if "pending_messages" not in users[user]:
+                    users[user]["pending_messages"] = []
+                users[user]["pending_messages"].append(message)
 
 async def disconnect_server(conn_id):
     connection_info = connections[conn_id]
