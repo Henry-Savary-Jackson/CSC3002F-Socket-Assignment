@@ -59,10 +59,10 @@ async def handle_message_main_server(conn_id, message):
         username = headers.get("sender")
         headers.pop(AUTH_TOKEN_HEADER_NAME)
         if not chat_id or not username:
-            await send_error(conn, message, "Missing chat_id or sender")
+            await send_error(conn, message, "Missing chat_id or sender!")
             return
         if chat_id not in group_chats:
-            group_chats[chat_id] = {"members": set(), "creator": username}
+            group_chats[chat_id] = {"members": set(), "creator": username, "messages":[]}
         group_chats[chat_id]["members"].add(username)
         for member in group_chats[chat_id]["members"]:
             if member == username:
@@ -116,7 +116,7 @@ async def run_server(host='localhost', port=5000):
             if len(connections) >= MAX_CONNECTIONS:
                 print(f"Rejected connection from {addr}: max connections reached")
                 try:
-                    await asyncio.get_running_loop().sock_sendall(conn, b"Server full\n")
+                    await asyncio.get_event_loop().sock_sendall(conn, b"Server full\n")
                 except:
                     pass
                 close(conn)
