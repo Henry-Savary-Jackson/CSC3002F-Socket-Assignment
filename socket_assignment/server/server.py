@@ -3,7 +3,7 @@ import socket
 from socket_assignment import users, connections, unacked_messages
 from socket_assignment.server import group_chats, handle_download_server, MAX_CONNECTIONS, handle_chat_message_server, disconnect_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
-from socket_assignment.utils.protocol import create_message, create_ack_message, create_error_message
+from socket_assignment.utils.protocol import create_message, create_ack_message, create_error_message, AUTH_TOKEN_HEADER_NAME
 from socket_assignment.security.auth import authentication_flow_server
 from socket_assignment.utils.exceptions import server_excpetions_handled
 from socket_assignment.client import send_message
@@ -57,22 +57,19 @@ async def handle_message_main_server(conn_id, message):
         headers = message.get("headers", {})
         chat_id = headers.get("chat_id")
         username = headers.get("sender")
+        headers.pop(AUTH_TOKEN_HEADER_NAME)
         if not chat_id or not username:
-            await send_error(conn, message, "Missing chat_id or sender")
+            await send_error(conn, message, "Missing chat_id or sender!")
             return
         if chat_id not in group_chats:
-            group_chats[chat_id] = {"members": set(), "creator": username}
+            group_chats[chat_id] = {"members": set(), "creator": username, "messages":[]}
         group_chats[chat_id]["members"].add(username)
         for member in group_chats[chat_id]["members"]:
             if member == username:
                 continue
             if member in users and "connection_id" in users[member]:
                 member_conn = connections[users[member]["connection_id"]]["connection"]
-                notify = create_message("JOIN_NOTIFY", headers={
-                    "chat_id": chat_id,
-                    "new_member": username
-                })
-                await send_message(member_conn, notify, awaitable=False)
+                await send_message(member_conn, message, awaitable=False)
         ack = create_ack_message(message)
         await send_message(conn, ack, awaitable=False)
     elif command == "REJECT":
@@ -80,16 +77,13 @@ async def handle_message_main_server(conn_id, message):
         chat_id = headers.get("chat_id")
         username = headers.get("sender")
         inviter = headers.get("inviter")
+        headers.pop(AUTH_TOKEN_HEADER_NAME)
         if not chat_id or not username or not inviter:
             await send_error(conn, message, "Missing chat_id, sender, or inviter")
             return
         if inviter in users and "connection_id" in users[inviter]:
             inviter_conn = connections[users[inviter]["connection_id"]]["connection"]
-            reject_msg = create_message("REJECT_NOTIFY", headers={
-                "chat_id": chat_id,
-                "user": username
-            })
-            await send_message(inviter_conn, reject_msg, awaitable=False)
+            await send_message(inviter_conn, message, awaitable=False)
         ack = create_ack_message(message)
         await send_message(conn, ack, awaitable=False)
     elif command == "DISCONNECT":
@@ -122,7 +116,7 @@ async def run_server(host='localhost', port=5000):
             if len(connections) >= MAX_CONNECTIONS:
                 print(f"Rejected connection from {addr}: max connections reached")
                 try:
-                    await asyncio.get_running_loop().sock_sendall(conn, b"Server full\n")
+                    await asyncio.get_event_loop().sock_sendall(conn, b"Server full\n")
                 except:
                     pass
                 close(conn)

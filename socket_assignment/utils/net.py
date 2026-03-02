@@ -64,5 +64,10 @@ def udp_server():
     sock.setblocking(False)
     return sock
 
+async def async_udp_client():
+    client_socket = socket(AF_INET, SOCK_DGRAM)
+    client_socket.setblocking(False)
+    return  client_socket
+
 async def recv_udp(sock):
     await asyncio.get_event_loop().sock_recvfrom(sock, BUF_SIZE )

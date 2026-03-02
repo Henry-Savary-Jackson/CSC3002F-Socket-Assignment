@@ -14,7 +14,7 @@ from socket_assignment.client.client import send_session, check_message_is_reply
 from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message, create_download_response_tcp
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
 from socket_assignment import connections, media
-from socket_assignment.server import handle_download_server, disconnect_server
+from socket_assignment.server import handle_download_server, disconnect_server, send_pending_messages
 
 
 async def handle_direct_message_peer(conn ,message):
@@ -60,7 +60,11 @@ async def handle_message_peer(conn_id,message):
       # find user
       # get from server if not found 
       await authentication_flow_server(conn, message, server_type="PEER")
-      
+
+      if "user_id" in connections[conn_id]:
+         user_id = connections[conn_id]["user_id"]
+         await send_pending_messages(user_id)
+            
    elif command == "MESSAGE":
       await handle_direct_message_peer(conn, message)
       
