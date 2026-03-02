@@ -1,5 +1,10 @@
 from socket_assignment.utils.net import close
 from socket_assignment import connections , users
+from socket_assignment.utils.exceptions import ServerError
+from socket_assignment.utils.protocol import create_download_response_tcp, create_ack_message
+from socket_assignment.client import send_message
+from socket_assignment import media
+
 
 VALID_COMMANDS_SERVER = ["CONNECT", "AUTHENTICATE", "ACK", "MESSAGE", "DOWNLOAD", "SESSION"]
 VALID_COMMANDS_PEER = [""]
@@ -20,12 +25,15 @@ async def handle_download_server(conn,message):
     else:
         if media_id not in media:
             raise ServerError(conn, message, "Media doesn't exist.")
-        response =  create_download_response_tcp(messgae, media[media_id]) 
+        response =  create_download_response_tcp(message, media[media_id]) 
         await send_message(conn, response,awaitable=False)
 
 
 async def handle_chat_message_server(conn ,message):
     pass
+#add message to the group chat
+#for each member in group send message if they are online send the message to them except the sender if not pend the message until they come online
+
 
 
 async def disconnect_server(conn_id):
