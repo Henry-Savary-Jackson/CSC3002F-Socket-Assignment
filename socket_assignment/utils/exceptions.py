@@ -21,7 +21,7 @@ def server_excpetions_handled(func):
     async def wrapper(*args, **kwargs):
         try :
             await func(*args, **kwargs)
-        except ServerError as se:
+        except ServerError as e:
             print(e)
             error_msg = create_error_message(e.original_message, e.message)
             await send_message(e.conn, error_msg, awaitable=False)
