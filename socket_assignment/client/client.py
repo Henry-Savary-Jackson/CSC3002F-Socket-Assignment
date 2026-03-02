@@ -1,26 +1,41 @@
 import asyncio
-
-import socket
-from socket_assignment.peer import  peer_tcp_port
+from socket import socket, AF_INET, SOCK_STREAM
 import uuid
 import asyncio
-from socket_assignment.client import  send_message,client_username, server_connection  , udp_socket, udp_port, client_chats
+from socket_assignment.client import  send_message,client_username, server_connection  
 from socket_assignment.utils.net import send, recv_message
 import nacl
 from socket_assignment import users, connections,unacked_messages
-from socket_assignment.utils.protocol import create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
+from socket_assignment.server import VALID_COMMANDS_PEER
+from socket_assignment.utils.protocol import create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message
 import socket
 import uuid
 import nacl.signing
 import nacl.encoding
 from socket_assignment.client import send_message
-from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_server
+from socket_assignment.utils.net import create_socket, connect, recv_message, close
 from socket_assignment.utils.protocol import create_message, create_authentication_message
 
 def generate_keypair():
     signing_key = nacl.signing.SigningKey.generate()
     verify_key = signing_key.verify_key
     return signing_key, verify_key
+
+
+async def async_tcp_client():
+    server_name = "localhost"
+    server_port = None
+    loop = asyncio.get_running_loop()
+    client_socket = socket(AF_INET, SOCK_STREAM)
+    client_socket.setblocking(False)
+    await loop.sock_connect(client_socket, (server_name, server_port))
+    username = input("Insert your username: ")
+    await loop.sock_sendall(client_socket, username.encode())
+    data = await loop.sock_recv(client_socket, 1024)
+    print("From Server:", data.decode())
+
+    client_socket.close()
+
 
 
 async def async_udp_client():
@@ -50,22 +65,18 @@ def check_message_is_reply(conn ,message):
 
         future = unacked_messages[reply_to_id]["future"]
         future.set_result(message)
-        unacked_messages.pop(reply_to_id)
-        return True
+        del unacked_messages[message_id]
 
-    return False
-
-async def authenticate(conn, username, signing_key, verify_key, peer_tcp_port, udp_port):
+async def authenticate(conn, username, signing_key, verify_key):
     public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
     connect_msg = create_message("CONNECT", headers={
         "sender": username,
         "public_key": public_key_b64,
         "ip": "127.0.0.1",
-        "port": peer_tcp_port,
-        "udp_port": udp_port
+        "port": "0",
+        "udp_port": "1"
     })
     challenge_msg = await send_message(conn, connect_msg, awaitable=True)
-    print("Received challenge",challenge_msg)
     if challenge_msg["command"] != "CHALLENGE":
         print("Expected CHALLENGE, got", challenge_msg["command"])
         return False
@@ -92,8 +103,11 @@ async def command_loop(conn, username):
                 print("Usage: /invite <target> <chat_id>")
                 continue
             target, chat_id = parts[1], parts[2]
-
-            msg = create_invite_message(username, target, chat_id, "")
+            msg = create_message("INVITE", headers={
+                "sender": username,
+                "target": target,
+                "chat_id": chat_id
+            })
             await send_message(conn, msg, awaitable=False)
             print(f"Invite sent to {target} for chat {chat_id}")
         elif parts[0] == "/join":
@@ -105,10 +119,10 @@ async def command_loop(conn, username):
                 "sender": username,
                 "chat_id": chat_id
             })
-            response = await send_message(conn, msg, awaitable=True)
+            future = await send_message(conn, msg, awaitable=True)
+            response = await future
             if response["command"] == "ACK":
                 print(f"Joined chat {chat_id}")
-                client_chats[chat_id] =  {"messages":[]}
             else:
                 print("Join failed")
         elif parts[0] == "/reject":
@@ -123,16 +137,6 @@ async def command_loop(conn, username):
             })
             await send_message(conn, msg, awaitable=False)
             print(f"Rejected invite for chat {chat_id}")
-
-        elif parts[0] == "/msg":
-            if len(parts) < 3:
-                print("Usage: /msg <chat_id> ")
-                continue
-        elif parts[0] == "/msg":
-            if len(parts) < 3:
-                print("Usage: /msg <chat_id> ")
-                continue
-
         elif parts[0] == "/quit":
             msg = create_message("DISCONNECT", headers={"sender": username})
             await send_message(conn, msg, awaitable=False)
@@ -147,7 +151,7 @@ async def client_listener(conn_id):
     try:
         async for message in recv_message(conn):
             try :
-                check_message_is_reply(conn, message)
+                await handle_message_as_client(conn, message)
             except Exception as e:
                 print(e)
     except ConnectionError as e:
@@ -158,11 +162,10 @@ async def client_listener(conn_id):
       print(f"Done with {conn.getsockname()}")
       conn.close()
 
-async def run_client():
+async def main():
     server_host = "localhost"
     server_port = 5000
     username = input("Enter your username: ")
-
     signing_key, verify_key = generate_keypair()
     sock = socket.socket()
     sock.setblocking(False)
@@ -170,18 +173,15 @@ async def run_client():
     await loop.sock_connect(sock, (server_host, server_port))
     print(f"Connected to server {server_host}:{server_port}")
 
-    connections["server"] = {"connection":sock }
+    success = await authenticate(sock, username, signing_key, verify_key)
+    if not success:
+        close(sock)
+ 
+    listener_task = asyncio.create_task(client_listener(conn_id))
+    await command_loop(sock, username)
 
-    listener_task = asyncio.create_task(client_listener("server"))
-
-    bind_server(udp_socket, udp_port)
-
-    success = await authenticate(sock, username, signing_key, verify_key, peer_tcp_port, udp_port)
-    if success:
-        await command_loop(sock, username)
-
-    close(sock)
     listener_task.cancel()
+    close(sock)
     print("Disconnected")
 
 
