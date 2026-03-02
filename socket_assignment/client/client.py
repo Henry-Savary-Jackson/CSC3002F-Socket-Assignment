@@ -15,7 +15,7 @@ import nacl.signing
 import nacl.encoding
 from socket_assignment.client import send_message
 from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_server
-from socket_assignment.utils.protocol import create_message, create_authentication_message
+from socket_assignment.utils.protocol import create_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
 
 def generate_keypair():
     signing_key = nacl.signing.SigningKey.generate()
@@ -23,20 +23,7 @@ def generate_keypair():
     return signing_key, verify_key
 
 
-async def async_udp_client():
-    server_name = "localhost"
-    server_port = None
 
-    loop = asyncio.get_running_loop()
-
-    client_socket = socket(AF_INET, SOCK_DGRAM)
-    client_socket.setblocking(False)
-
-    username = input("Insert your username: ")
-    await loop.sock_sendto(client_socket, username.encode(), (server_name, server_port))
-    data, addr = await loop.sock_recvfrom(client_socket, 2048)
-    print("From Server:", data.decode())
-    client_socket.close()
 
 
 def check_message_is_reply(conn ,message):
@@ -55,7 +42,8 @@ def check_message_is_reply(conn ,message):
 
     return False
 
-async def authenticate(conn, username, signing_key, verify_key, peer_tcp_port, udp_port):
+async def authenticate(conn_id, username, signing_key, verify_key, peer_tcp_port, udp_port):
+    conn = connections[conn_id]
     public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
     connect_msg = create_message("CONNECT", headers={
         "sender": username,
@@ -75,13 +63,18 @@ async def authenticate(conn, username, signing_key, verify_key, peer_tcp_port, u
                               data=signature, reply=challenge_msg["message_id"])
     ack = await send_message(conn, auth_msg, awaitable=True)
     if ack["command"] == "ACK":
+
+        token = ack["headers"][AUTH_TOKEN_HEADER_NAME]
+        connections["client_token"]  = token
         print("Authentication successful")
         return True
     else:
         print("Authentication failed")
         return False
 
-async def command_loop(conn, username):
+async def command_loop(conn_id, username):
+    conn = connections[conn_id] 
+    
     while True:
         cmd = await asyncio.get_event_loop().run_in_executor(None, input, "Enter command: ")
         parts = cmd.split()
@@ -93,7 +86,7 @@ async def command_loop(conn, username):
                 continue
             target, chat_id = parts[1], parts[2]
 
-            msg = create_invite_message(username, target, chat_id, "")
+            msg = create_invite_message(username, target, chat_id, connections[conn_id]["client_token"])
             await send_message(conn, msg, awaitable=False)
             print(f"Invite sent to {target} for chat {chat_id}")
         elif parts[0] == "/join":
@@ -128,9 +121,9 @@ async def command_loop(conn, username):
             if len(parts) < 3:
                 print("Usage: /msg <chat_id> ")
                 continue
-        elif parts[0] == "/msg":
+        elif parts[0] == "/dmsg":
             if len(parts) < 3:
-                print("Usage: /msg <chat_id> ")
+                print("Usage: /msg <user_id> ")
                 continue
 
         elif parts[0] == "/quit":
@@ -170,15 +163,17 @@ async def run_client():
     await loop.sock_connect(sock, (server_host, server_port))
     print(f"Connected to server {server_host}:{server_port}")
 
-    connections["server"] = {"connection":sock }
+    server_conn_id = "server"
+
+    connections[server_conn_id] = {"connection":sock }
 
     listener_task = asyncio.create_task(client_listener("server"))
 
     bind_server(udp_socket, udp_port)
 
-    success = await authenticate(sock, username, signing_key, verify_key, peer_tcp_port, udp_port)
+    success = await authenticate(server_conn_id, username, signing_key, verify_key, peer_tcp_port, udp_port)
     if success:
-        await command_loop(sock, username)
+        await command_loop(server_conn_id, username)
 
     close(sock)
     listener_task.cancel()

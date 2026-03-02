@@ -10,7 +10,6 @@ server_adress = "localhost"
 
 udp_port =random.randrange(9000)
 
-
 udp_socket = udp_server(udp_port)
 
 client_username =None 
@@ -18,6 +17,9 @@ client_public_key_b64 = None
 client_private_key_b64 = None
 
 client_chats = dict()
+
+
+pending_invites = []
 
 async def send_message(conn ,message, awaitable=True):
     """Given a socket, send this message to this socket
@@ -43,10 +45,13 @@ async def send_message(conn ,message, awaitable=True):
 
     # this returns a future, so that the caller can await the response from the remote connection
 
+async def send_message_udp(udp_sock, message, server_name, server_port):
+    await asyncio.get_event_loop().sock_sendto(udp_sock, message_to_bytes(message), (server_name, server_port))
+
 # for each  user, store ip, addr, connection id, public_key
 async def send_session(username):
     connection_info  = connections["server"]
-    token =connection_info["token"]
+    token =connection_info["client_token"]
 
     message = create_session_message(username, client_username, token)
 
