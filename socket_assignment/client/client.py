@@ -11,7 +11,7 @@ import nacl
 from mimetypes import guess_type
 from socket_assignment import users, connections,unacked_messages
 from socket_assignment.utils.protocol import create_reject_message,create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
-from socket_assignment.utils.exceptions import server_exceptions_handled
+from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
 import socket
 import uuid
 import nacl.signing
