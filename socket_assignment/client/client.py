@@ -212,7 +212,7 @@ async def client_listener(conn_id):
         conn.close()
 
 async def run_client():
-    server_host = "localhost"
+    server_host = "127.0.0.1"
     server_port = 5000
     username = input("Enter your username: ")
 
