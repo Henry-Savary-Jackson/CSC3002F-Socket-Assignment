@@ -124,8 +124,11 @@ def create_error_message(original, cause):
     headers = {"cause":cause, REPLY_HEADER_NAME:original["message_id"]}
     return create_message("ERROR", headers)
 
-def create_join_message(original,username, chat_id):
-    return create_message("JOIN", {"sender":username, "chat_id":chat_id}, reply=original["message_id"])
+def create_join_message(original,username,inviter ,chat_id, token):
+    return create_message("JOIN", {"sender":username, "chat_id":chat_id, "inviter":inviter}, reply=original["message_id"], token=token)
+
+def create_reject_message(original,username, inviter,chat_id, token):
+    return create_message("REJECT", {"sender":username, "chat_id":chat_id, "inviter":inviter }, reply=original["message_id"], token=token)
 
 def create_download_response_tcp(original, media):
     data = base64.b64decode(media["data"].encode())
@@ -134,4 +137,19 @@ def create_download_response_tcp(original, media):
 
 
 def create_invite_message(sender,other_username, chat_id,token):
-    return create_message("INVITE", {"sender":sender,"chat_id":chat_id, "other":other_username}, token=token ) 
+    return create_message("INVITE", {"sender":sender,"chat_id":chat_id, "target":other_username}, token=token ) 
+
+def create_chat_message(sender, chat_id, data,mimetype, token, filename=None):
+    headers = {"chat_id":chat_id, "mimetype":mimetype , "content_length":len(data)}
+    if filename:
+        headers["filename"] = filename
+    return create_message("MESSAGE", headers, data=data, token=token) 
+
+def create_direct_message(sender, other_user, data,mimetype,token):
+    headers = {"recipient":other_user, "mimetype":mimetype , "content_length":len(data)}
+    if filename:
+        headers["filename"] = filename
+    return create_message("MESSAGE", headers, data=data, token=token) 
+
+def create_newchat_message(sender, chat_name, token):
+    return create_message("CREATE", {"chat_name":chat_name, "sender":sender}, token=token)

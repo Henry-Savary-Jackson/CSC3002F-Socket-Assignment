@@ -4,12 +4,17 @@ from uuid import uuid4
 import nacl 
 import base64
 from socket_assignment import users, connections
-from socket_assignment.client import send_session, send_message, client_public_key_b64, client_private_key_b64
-from socket_assignment.utils.protocol import create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
+from socket_assignment.client.client_sending import send_session, send_message
+from socket_assignment.utils.protocol import create_message, AUTH_TOKEN_HEADER_NAME,create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
 
 CHALLENGE_SIZE = 128
 TOKEN_SIZE = 128
+
+def generate_keypair():
+    signing_key = nacl.signing.SigningKey.generate()
+    verify_key = signing_key.verify_key
+    return signing_key, verify_key
 
 def create_challenge():
     return base64.b64encode(random.randbytes(CHALLENGE_SIZE))
@@ -91,12 +96,62 @@ async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
         raise ServerError(conn, authenticate_msg, "Invalid Signature!")
 
 
-async def create_keypair():
-    signing_key = nacl.signing.SigningKey.generate()
-    private_key = signing_key.encode(nacl.encoding.Base64Encoder)
-    public_key = signing_key.verify_key.encode(nacl.encoding.Base64Encoder)
-    return private_key, public_key
-        
+async def authenticate_flow_client(conn_id, username, signing_key, verify_key, peer_tcp_port, udp_port):
+    conn = connections[conn_id]["connection"]
+    public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
+    connect_msg = create_message("CONNECT", headers={
+        "sender": username,
+        "public_key": public_key_b64,
+        "ip": "127.0.0.1",
+        "port": peer_tcp_port,
+        "udp_port": udp_port
+    })
+    challenge_msg = await send_message(conn, connect_msg, awaitable=True)
+    print("Received challenge",challenge_msg)
+    if challenge_msg["command"] != "CHALLENGE":
+        print("Expected CHALLENGE, got", challenge_msg["command"])
+        return False
+    challenge_data = challenge_msg["data"]
+    signature = signing_key.sign(challenge_data)
+    auth_msg = create_message("AUTHENTICATE", headers={"sender": username},
+                              data=signature, reply=challenge_msg["message_id"])
+    ack = await send_message(conn, auth_msg, awaitable=True)
+    if ack["command"] == "ACK":
+
+        token = ack["headers"][AUTH_TOKEN_HEADER_NAME]
+        connections[conn_id]["client_token"]  = token
+        print("Authentication successful")
+        return True
+    else:
+        print("Authentication failed")
+        return False
+
+async def connect_to_peer(username, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
+    assert username in users
+
+    peer_sock = create_socket()
+
+    user_info = users[username]
+
+    assert "ip" in user_info
+    assert "port" in user_info
+    assert "udp_port" in user_info
 
 
-    
+    tcp_port = user_info["port"]
+    udp = udp_port["port"]
+
+
+    await connect(peer_sock, user_info["ip"], user_info["port"])
+    conn_id  = str(uuid4())
+    connections[conn_id] = { "connection": peer_sock, "user_id": username}
+    result = await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
+    if not result:
+        del connections[conn_id]
+        return None
+
+    user_info["connection_id"] = conn_id
+
+    return conn_id
+    # start listening as a peer on this new socket
+

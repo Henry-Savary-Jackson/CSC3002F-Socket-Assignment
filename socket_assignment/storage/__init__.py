@@ -29,7 +29,7 @@ def load_sign_verify_key():
     with open(PRIVATE_KEY_PATH, "rb") as priv_key_file:
         privkey_bytes = priv_key_file.read()
         signing_key = nacl.signing.SigningKey(privkey_bytes)
-        return privkey_bytes, signing_key.verify_key.encode()
+        return signing_key, signing_key.verify_key
 
 
 def store_media(media):

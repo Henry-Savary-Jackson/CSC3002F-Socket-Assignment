@@ -2,13 +2,14 @@ import asyncio
 from uuid import uuid4
 import socket
 from socket_assignment import users, connections, unacked_messages
-from socket_assignment.server import group_chats, handle_download_server, MAX_CONNECTIONS, handle_chat_message_server, disconnect_server
+from socket_assignment.server import group_chats,  MAX_CONNECTIONS, disconnect_server
+from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
 from socket_assignment.utils.protocol import create_message, create_ack_message, create_error_message, AUTH_TOKEN_HEADER_NAME
 from socket_assignment.security.auth import authentication_flow_server
-from socket_assignment.utils.exceptions import server_exceptions_handled
-from socket_assignment.client import send_message
-from socket_assignment.client.client import check_message_is_reply
+from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
+from socket_assignment.client.client_sending import send_message , send_message_to_user
+from socket_assignment.server.message_handling import check_if_token_is_valid, check_message_is_reply 
 
 
 async def send_error(conn, original_msg, explanation):
@@ -34,63 +35,83 @@ async def handle_message_main_server(conn_id, message):
         target = headers.get("target")
         chat_id = headers.get("chat_id")
         sender = headers.get("sender")
+        headers.pop(AUTH_TOKEN_HEADER_NAME)
+
         if not target or not chat_id or not sender:
-            await send_error(conn, message, "Missing target, chat_id, or sender")
-            return
+            raise ServerError(conn, message, "Missing target, chat_id, or sender!")
         if target not in users:
-            await send_error(conn, message, f"User {target} does not exist")
-            return
-        target_info = users[target]
-        if "connection_id" not in target_info:
-            await send_error(conn, message, f"User {target} is offline")
-            return
-        target_conn_id = target_info["connection_id"]
-        target_conn = connections[target_conn_id]["connection"]
-        invite_msg = create_message("INVITE", headers={
-            "chat_id": chat_id,
-            "sender": sender,
-            "target": target
-        }, reply=message["message_id"])
-        await send_message(target_conn, invite_msg, awaitable=False)
+            raise ServerError(conn, message, f"User {target} does not exist!")
+
+        # send invite notification to target
+        await send_message_to_user(target, message) 
+
+        # acknowledge message to inviter
         ack = create_ack_message(message)
         await send_message(conn, ack, awaitable=False)
+
     elif command == "JOIN":
         headers = message.get("headers", {})
         chat_id = headers.get("chat_id")
-        username = headers.get("sender")
+        sender = headers.get("sender")
+        inviter = headers.get("inviter")
+        # get rid of authentication token
         headers.pop(AUTH_TOKEN_HEADER_NAME)
-        if not chat_id or not username:
-            await send_error(conn, message, "Missing chat_id or sender!")
-            return
+
+        if not chat_id or not sender or not inviter:
+            raise ServerError(conn, message,"Missing chat_id or sender or inviter!" ) 
+        if inviter not in users:
+            raise ServerError(conn, message,f"Inviter user {inviter} doesn't exist!" ) 
         if chat_id not in group_chats:
-            group_chats[chat_id] = {"members": set(), "creator": username, "messages":[]}
-        group_chats[chat_id]["members"].add(username)
+            raise ServerError(conn, message,f"Group chat {chat_id} doesn't exist!" ) 
+        
+
+        # alert all members of group chat
         for member in group_chats[chat_id]["members"]:
-            if member == username:
-                continue
-            if member in users and "connection_id" in users[member]:
-                member_conn = connections[users[member]["connection_id"]]["connection"]
-                await send_message(member_conn, message, awaitable=False)
+            await send_message_to_user(member, message)
+
+        # add to list of memeber
+        group_chats[chat_id]["members"].add(sender)
+
         ack = create_ack_message(message)
         await send_message(conn, ack, awaitable=False)
+
     elif command == "REJECT":
         headers = message.get("headers", {})
         chat_id = headers.get("chat_id")
-        username = headers.get("sender")
+        sender = headers.get("sender")
         inviter = headers.get("inviter")
         headers.pop(AUTH_TOKEN_HEADER_NAME)
-        if not chat_id or not username or not inviter:
-            await send_error(conn, message, "Missing chat_id, sender, or inviter")
-            return
-        if inviter in users and "connection_id" in users[inviter]:
-            inviter_conn = connections[users[inviter]["connection_id"]]["connection"]
-            await send_message(inviter_conn, message, awaitable=False)
+        if not chat_id or not sender or not inviter:
+            raise ServerError(conn, message,"Missing chat_id, sender, or inviter!")
+        if inviter not in users:
+            raise ServerError(conn, message,f"Inviter user {inviter} doesn't exist!" ) 
+        if chat_id not in group_chats:
+            raise ServerError(conn, message,f"Group chat {chat_id} doesn't exist!" ) 
+
+        # tell the inviter they rejected
+        await send_message_to_user(inviter, message)
+
+        # tell invitee that the message was acknowledged
         ack = create_ack_message(message)
         await send_message(conn, ack, awaitable=False)
+
     elif command == "DISCONNECT":
         disconnect_server(conn_id)
+    elif command == "CREATE":
+        chat_id = str(uuid4())
+        headers = message["headers"]
+        if "chat_name" not in headers:
+            raise ServerError(conn, message, "No chat_name given!")
+
+        chat_name = headers["chat_name"]
+        sender = headers["sender"]
+        # creagte new group chat
+        group_chats[chat_id] = {"members": set(sender), "creator":sender ,"name":chat_name, "messages":[]}
+
+        await send_message(conn, create_ack_message(message, headers={"chat_id":chat_id}), awaitable=False)
+
     else:
-        await send_error(conn, message, f"Unknown command {command}")
+        raise ServerError(conn, message, f"Unknown command {command}")
 
 async def handle_new_conn(conn_id):
     assert conn_id in connections
@@ -101,7 +122,7 @@ async def handle_new_conn(conn_id):
     except (ConnectionError, BlockingIOError) as e:
         print(f"Connection error: {e}")
     finally:
-        print(f"Done with {conn.getsockname()}")
+        print(f"Done with {conn}")
         await disconnect_server(conn_id)
 
 async def run_server(host='localhost', port=5000):

@@ -9,12 +9,13 @@ import asyncio
 from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
 from socket_assignment.storage import add_new_media, store_message_in_chat
 from socket_assignment.utils.net import create_socket ,get_connections, send, recvall, close, recv_message
-from socket_assignment.client import users, unacked_messages, send_message, client_chats
-from socket_assignment.client.client import send_session, check_message_is_reply 
+from socket_assignment.client import unacked_messages, client_chats
+from socket_assignment.client.client_sending import send_session ,send_message,send_pending_messages
 from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message, create_download_response_tcp
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
 from socket_assignment import connections, media
-from socket_assignment.server import handle_download_server, disconnect_server, send_pending_messages
+from socket_assignment.server import  disconnect_server
+from socket_assignment.server.message_handling import handle_download_server,  check_message_is_reply
 
 
 async def handle_direct_message_peer(conn ,message):

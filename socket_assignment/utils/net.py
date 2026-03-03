@@ -56,7 +56,6 @@ async def recv(conn, n):
         
 
 async def send(conn,data):
-    print("Sending...")
     await asyncio.get_event_loop().sock_sendall(conn, data)
 
 def udp_server():

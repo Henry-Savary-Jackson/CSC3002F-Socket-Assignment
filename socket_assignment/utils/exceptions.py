@@ -1,7 +1,7 @@
 import asyncio
 
 import functools
-from socket_assignment.client import send_message
+from socket_assignment.client.client_sending import send_message
 from socket_assignment.utils.protocol import create_error_message
 
 
@@ -9,6 +9,7 @@ class ServerError(Exception):
     """raise this when you encounter a message that causes an error."""
     def __init__(self,conn, original_message, cause ):
         super().__init__(cause)
+        self.msg = cause
         self.conn = conn
         self.original_message= original_message
 
@@ -22,8 +23,8 @@ def server_exceptions_handled(func):
         try :
             await func(*args, **kwargs)
         except ServerError as se:
-            print(e)
-            error_msg = create_error_message(e.original_message, e.message)
-            await send_message(e.conn, error_msg, awaitable=False)
+            print(se)
+            error_msg = create_error_message(se.original_message, se.msg)
+            await send_message(se.conn, error_msg, awaitable=False)
 
     return wrapper
