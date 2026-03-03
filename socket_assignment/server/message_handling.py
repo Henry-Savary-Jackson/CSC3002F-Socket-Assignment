@@ -7,6 +7,7 @@ from socket_assignment.utils.protocol import create_download_response_tcp, creat
 from socket_assignment.client.client_sending import send_message, send_message_udp, send_message_to_user
 from socket_assignment.utils.protocol import AUTH_TOKEN_HEADER_NAME
 from socket_assignment import media
+from socket_assignment.server import group_chats
 
 def check_message_is_reply(conn ,message):
     command = message["command"]
@@ -75,8 +76,11 @@ async def handle_download_server(conn_id,message):
 
 async def handle_chat_message_server(conn ,message):
      #check if chat_id is specified
-    if "chat_id" not in message["headers"]:
-        raise ServerError(conn, message, "Chat id is not specified.")
+    headers = message["headers"]
+    if "chat_id" not in headers:
+        raise ServerError(conn, message, "chat_id is not specified!")
+    if "sender" not in headers: 
+        raise ServerError(conn, message, "Missing sender header!")
     group_id = message["headers"]["chat_id"]
     sender = message["headers"]["sender"]
     #send message to all members in the group except the sender

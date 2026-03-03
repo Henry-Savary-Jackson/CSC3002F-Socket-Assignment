@@ -53,13 +53,14 @@ async def handle_message_as_client(conn_id, message):
             raise ServerError(conn, message, "chat_id is missing")
         chat_id = headers["chat_id"] 
         store_message_in_chat(chat_id, message, client_chats) 
+        print(f"New message! : \n{message["data"].decode()}\n")
     elif cmd == "INVITE":
-        print(f"New invite! {message["message_id"]}")
+        print(f"New invite to chat {message["message_id"]}!")
         pending_invites.append(message)
     elif cmd == "JOIN":
-        print(f"User joined chat! {message["headers"]["sender"]}")
+        print(f"User  {message["headers"]["sender"]} joined chat {message["headers"]["chat_id"]}!")
     elif cmd == "REJECT":
-        print(f"User rejected! {message["headers"]["sender"]}")
+        print(f"User {message["headers"]["sender"]} rejected chat invite {message["headers"]["chat_id"]}!")
 
 
 async def command_loop(conn_id, username):
@@ -90,10 +91,11 @@ async def command_loop(conn_id, username):
             if pending_invites:
                 latest = pending_invites.pop()
                 chat_id = latest["headers"]["chat_id"]
+                inviter = latest["headers"]["sender"]
                 print(f"new pending invite to {chat_id} from {latest["headers"]["sender"]}")
                 decision = input("(A)ccept/(R)eject?\n").upper()[:1]
                 if decision == "A":
-                    msg = create_join_message(latest, username, chat_id, conn_info["client_token"])
+                    msg = create_join_message(latest, username, inviter,chat_id, conn_info["client_token"])
                     response = await send_message(conn,msg)
                     if response["command"] == "ACK":
                         client_chats[chat_id] =  {"messages":[]}
@@ -101,7 +103,7 @@ async def command_loop(conn_id, username):
                     else:
                         print("Join failed")
                 else:
-                    msg = create_reject_message(latest, username, chat_id, conn_info["client_token"])
+                    msg = create_reject_message(latest, username, inviter,chat_id, conn_info["client_token"])
                     await send_message(conn, msg, awaitable=False)
                     print(f"Rejected invite for chat {chat_id}")
 
@@ -202,12 +204,12 @@ async def client_listener(conn_id):
             except Exception as e:
                 print(e)
     except ConnectionError as e:
-      print(f"Error:{e}") 
+        print(f"\nError:{e}") 
     except BlockingIOError as be:
-      print(f"Blocking Error:{be}")
+        print(f"\nBlocking Error:{be}")
     finally:
-      print(f"Done with {conn.getsockname()}")
-      conn.close()
+        print("\nDisconnected to server!")
+        conn.close()
 
 async def run_client():
     server_host = "localhost"
@@ -219,7 +221,7 @@ async def run_client():
     sock.setblocking(False)
     loop = asyncio.get_running_loop()
     await loop.sock_connect(sock, (server_host, server_port))
-    print(f"Connected to server {server_host}:{server_port}")
+    print(f"\nConnected to server {server_host}:{server_port}")
 
     server_conn_id = "server"
 

@@ -140,13 +140,13 @@ def create_invite_message(sender,other_username, chat_id,token):
     return create_message("INVITE", {"sender":sender,"chat_id":chat_id, "target":other_username}, token=token ) 
 
 def create_chat_message(sender, chat_id, data,mimetype, token, filename=None):
-    headers = {"chat_id":chat_id, "mimetype":mimetype , "content_length":len(data)}
+    headers = {"chat_id":chat_id, "mimetype":mimetype , "content_length":len(data), "sender":sender}
     if filename:
         headers["filename"] = filename
     return create_message("MESSAGE", headers, data=data, token=token) 
 
 def create_direct_message(sender, other_user, data,mimetype,token):
-    headers = {"recipient":other_user, "mimetype":mimetype , "content_length":len(data)}
+    headers = {"recipient":other_user, "mimetype":mimetype , "content_length":len(data), "sender":sender}
     if filename:
         headers["filename"] = filename
     return create_message("MESSAGE", headers, data=data, token=token) 

@@ -2,7 +2,7 @@ import asyncio
 from uuid import uuid4
 import socket
 from socket_assignment import users, connections, unacked_messages
-from socket_assignment.server import group_chats,  MAX_CONNECTIONS, disconnect_server
+from socket_assignment.server import group_chats,  MAX_CONNECTIONS, disconnect_server, server_sock
 from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
 from socket_assignment.utils.protocol import create_message, create_ack_message, create_error_message, AUTH_TOKEN_HEADER_NAME
@@ -106,7 +106,10 @@ async def handle_message_main_server(conn_id, message):
         chat_name = headers["chat_name"]
         sender = headers["sender"]
         # creagte new group chat
-        group_chats[chat_id] = {"members": set(sender), "creator":sender ,"name":chat_name, "messages":[]}
+        members = set()
+        group_chats[chat_id] = {"members":members, "creator":sender ,"name":chat_name, "messages":[]}
+
+        members.add(sender)
 
         await send_message(conn, create_ack_message(message, headers={"chat_id":chat_id}), awaitable=False)
 
@@ -125,9 +128,10 @@ async def handle_new_conn(conn_id):
         print(f"Done with {conn}")
         await disconnect_server(conn_id)
 
+
 async def run_server(host='localhost', port=5000):
     
-    sock = create_socket()
+    sock = server_sock 
     try :
         sock.bind((host, port))
         sock.listen(100)
@@ -148,11 +152,13 @@ async def run_server(host='localhost', port=5000):
             connections[conn_id] = { "connection":conn} 
             asyncio.create_task(handle_new_conn(conn_id))
         
+    except asyncio.CancelledError as e:
+        print("cancelled")
     except Exception as e:
         print(e)
-        sock.close()
     except InterruptedError as e:
         print(e)
+    finally:
         sock.close()
 
 if __name__ == "__main__":
