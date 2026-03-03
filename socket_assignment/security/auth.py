@@ -5,6 +5,7 @@ import nacl
 import base64
 from socket_assignment import users, connections
 from socket_assignment.client.client_sending import send_session, send_message
+from socket_assignment.utils.net import connect, create_socket
 from socket_assignment.utils.protocol import create_message, AUTH_TOKEN_HEADER_NAME,create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
 
@@ -139,7 +140,7 @@ async def connect_to_peer(username, client_username, signing_key,verify_key, use
 
 
     tcp_port = user_info["port"]
-    udp = udp_port["port"]
+    udp = user_info["udp_port"]
 
 
     await connect(peer_sock, user_info["ip"], user_info["port"])
