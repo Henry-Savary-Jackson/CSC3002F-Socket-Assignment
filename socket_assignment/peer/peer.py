@@ -82,7 +82,7 @@ async def handle_message_peer(conn_id,message):
       await handle_direct_message_peer(conn, message)
       
    elif command == "DOWNLOAD":
-      await handle_download_server(conn, message) 
+      await handle_download_server(conn, server) 
 
    elif command == "DISCONNECT":
       # delete connections

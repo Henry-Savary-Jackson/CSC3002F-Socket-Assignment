@@ -7,7 +7,6 @@ import base64
 from socket_assignment import users, connections
 from socket_assignment.client.client_sending import send_session, send_message
 from socket_assignment.utils.net import create_socket, connect
-from socket_assignment.utils.net import connect, create_socket
 from socket_assignment.utils.protocol import create_message, AUTH_TOKEN_HEADER_NAME,create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
 
@@ -129,32 +128,22 @@ async def authenticate_flow_client(conn_id, username, signing_key, verify_key, p
         print("Authentication failed")
         return False
 
-async def connect_to_peer(username, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
-    assert username in users
-
-    peer_sock = create_socket()
-
-    user_info = users[username]
-
-    assert "ip" in user_info
-    assert "port" in user_info
-    assert "udp_port" in user_info
 
 
-    tcp_port = user_info["port"]
-    udp = user_info["udp_port"]
+async def connect_to_peer(target, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
 
+    user_info = users[target]
+    conn_id = user_info["connection_id"]
+    
+    assert conn_id in connections
+    assert "connection" in connections[conn_id]
 
-    await connect(peer_sock, user_info["ip"], user_info["port"])
-    conn_id  = str(uuid4())
-    connections[conn_id] = { "connection": peer_sock, "user_id": username}
-    result = await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
-    if not result:
-        del connections[conn_id]
-        return None
+    sock = connections[conn_id]["connection"]
 
-    user_info["connection_id"] = conn_id
+    try :
+        await connect(sock, user_info["ip"], user_info["port"] )
 
-    return conn_id
-    # start listening as a peer on this new socket
+        return await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
+    except ConnectionError, OSError:
+        return False
 
