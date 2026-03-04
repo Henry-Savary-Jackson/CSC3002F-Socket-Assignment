@@ -144,6 +144,6 @@ async def connect_to_peer(target, client_username, signing_key,verify_key, user_
         await connect(sock, user_info["ip"], user_info["port"] )
 
         return await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
-    except ConnectionError, OSError:
+    except (ConnectionError, OSError):
         return False
 
