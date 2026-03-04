@@ -4,11 +4,13 @@ import random
 from uuid import uuid4
 import nacl 
 import base64
-from socket_assignment import users, connections
+import socket_assignment
+from socket_assignment import connections
 from socket_assignment.client.client_sending import send_session, send_message
 from socket_assignment.utils.net import create_socket, connect
 from socket_assignment.utils.protocol import create_message, AUTH_TOKEN_HEADER_NAME,create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
+from socket_assignment.storage import store_users
 
 CHALLENGE_SIZE = 128
 TOKEN_SIZE = 128
@@ -24,13 +26,23 @@ def create_challenge():
 def get_auth_token():
     return base64.b64encode(random.randbytes(TOKEN_SIZE))
 
-async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
-    
+async def authentication_flow_server(server_name,conn_id,connect_msg,server_type="SERVER"):
+    users = socket_assignment.users
+
     conn = connections[conn_id]["connection"]
 
     headers = connect_msg["headers"]
-    assert "sender" in headers 
+    if "sender" not in headers:
+        raise ServerError(conn, connect_msg, "Missing sender header!")
     sender = headers["sender"]
+
+    if "ip" not in headers:
+        raise ServerError(conn, connect_msg, "Missing ip header!")
+    if "port" not in headers:
+        raise ServerError(conn, connect_msg, "Missing port header!")
+    if "udp_port" not in headers:
+        raise ServerError(conn, connect_msg, "Missing udp_port header!")
+
     if sender not in users and server_type == "SERVER":
 
         if "public_key" not in  headers:
@@ -46,11 +58,14 @@ async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
         udp_port = int(headers["udp_port"])
 
         users[sender] = { "public_key":public_key_b64, "username":sender, "ip": ip, "port":port, "udp_port":udp_port}
+        print("Storing")
         # get from server
 
         # create new user
+        store_users(server_name,users)
     elif server_type == "PEER":
-        ip, port, public_key = await send_session(sender)
+        ip, port, public_key = await send_session(sender, server_name)
+        store_users(server_name, users)
 
 
     user = users[sender] 
@@ -83,6 +98,9 @@ async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
 
         user["connection_id"] = conn_id  # link the user to its connections
         
+        user["ip"] = headers["ip"]
+        user["port"] = headers["port"]
+        user["udp_port"] = headers["udp_port"]
         # store info about this connection in order to be used later
         connections[conn_id].update({
             "user_id":sender,
@@ -100,14 +118,15 @@ async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
 
 async def authenticate_flow_client(conn_id, username, signing_key, verify_key, peer_tcp_port, udp_port):
     conn = connections[conn_id]["connection"]
-    public_key_b64 = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode()
-    connect_msg = create_message("CONNECT", headers={
+    connect_headers = {
         "sender": username,
-        "public_key": public_key_b64,
         "ip": "127.0.0.1",
         "port": peer_tcp_port,
         "udp_port": udp_port
-    })
+    }
+    if verify_key:
+        connect_headers["public_key"] = verify_key.encode(encoder=nacl.encoding.Base64Encoder).decode() 
+    connect_msg = create_message("CONNECT",headers=connect_headers )
     challenge_msg = await send_message(conn, connect_msg, awaitable=True)
     print("Received challenge message!")
     if challenge_msg["command"] != "CHALLENGE":
@@ -122,26 +141,30 @@ async def authenticate_flow_client(conn_id, username, signing_key, verify_key, p
 
         token = ack["headers"][AUTH_TOKEN_HEADER_NAME]
         connections[conn_id]["token"]  = token
-        print("Authentication successful")
+        print("Authentication successful.\n")
         return True
     else:
-        print("Authentication failed")
+        print("Authentication failed!\n")
         return False
 
+async def connect_to_peer(username, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
+    users = socket_assignment.users
+    assert username in users
+
+    try:
+        peer_sock = create_socket()
+
+        user_info = users[username]
+
+        assert "ip" in user_info
+        assert "port" in user_info
+        assert "udp_port" in user_info
 
 
-async def connect_to_peer(target, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
+        tcp_port = user_info["port"]
+        udp = user_info["udp_port"]
 
-    user_info = users[target]
-    conn_id = user_info["connection_id"]
-    
-    assert conn_id in connections
-    assert "connection" in connections[conn_id]
-
-    sock = connections[conn_id]["connection"]
-
-    try :
-        await connect(sock, user_info["ip"], user_info["port"] )
+        await connect(peer_sock, user_info["ip"], user_info["port"])
 
         return await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
     except (ConnectionError, OSError):

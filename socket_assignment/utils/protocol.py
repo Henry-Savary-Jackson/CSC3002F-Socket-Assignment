@@ -149,8 +149,8 @@ def create_download_message_tcp(original, media_id, token):
     return create_message("DOWNLOAD", {"media_id":media_id}, token=token )
 
 
-def create_invite_message(sender,other_username, chat_id,token):
-    return create_message("INVITE", {"sender":sender,"chat_id":chat_id, "target":other_username}, token=token ) 
+def create_invite_message(sender,other_username, chat_id, chat_name,token):
+    return create_message("INVITE", {"sender":sender,"chat_id":chat_id,"chat_name":chat_name, "target":other_username}, token=token ) 
 
 def create_chat_message(sender, chat_id, data,mimetype, token, filename=None):
     headers = {"chat_id":chat_id, "mimetype":mimetype , "content_length":len(data), "sender":sender}

@@ -9,15 +9,13 @@ from socket_assignment.storage import store_message_in_chat
 server_connection = create_socket()
 server_adress = "localhost"
 
-udp_port =random.randrange(13000)
+udp_port = None
 
 udp_socket = udp_server()
 
 client_username =None  # global variable for username
 client_signing_key = None # this is supposed to be a nacl.signing.SigningKey
 client_verifier_key = None # this is supposed to be a nacl.signing.SigningKey
-
-client_chats = dict() # global variable for storing chats and messages inside 
 
 pending_invites = [] # sglobal variable tores all the pending invites the client has received
 

@@ -5,12 +5,14 @@ import socket
 from pathlib import Path
 from uuid import uuid4
 import asyncio
-from socket_assignment.client import  client_username, server_connection  , udp_socket, udp_port 
+from socket_assignment.client import   server_connection  , udp_socket, udp_port 
 from socket_assignment.utils.net import send, recv_message
 import nacl
 from mimetypes import guess_type
-from socket_assignment import users, connections,unacked_messages
+import socket_assignment
+from socket_assignment import  connections,unacked_messages
 from socket_assignment.utils.protocol import create_session_message,create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
+from socket_assignment.storage import  store_users
 import socket
 import uuid
 import nacl.signing
@@ -18,7 +20,8 @@ import nacl.encoding
 from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_server
 from socket_assignment.utils.protocol import create_message,create_chat_message, create_direct_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
 
-async def send_pending_messages(user_id):
+async def send_pending_messages(current_username,user_id):
+    users = socket_assignment.users
     "Send all the pendings messages, if any to a user once they have connected."
     user_info  = users[user_id]
     if "connection_id" not in user_info:
@@ -32,7 +35,12 @@ async def send_pending_messages(user_id):
     while pending_messages:
         # while there are still unsent messages,send the first one
         message = pending_messages.pop(0)
+        # pending messages would store their data as str not bytes
+        if "data" in message and message["data"] and type(message["data"]) == str:
+            message["data"] = message["data"].encode()
         await send_message(conn, message, awaitable=False)
+
+    store_users(current_username, users)
 
 
 async def send_message(conn ,message, awaitable=True):
@@ -64,13 +72,12 @@ async def send_message_udp(udp_sock, message, server_ip, server_port):
     await asyncio.get_event_loop().sock_sendto(udp_sock, message_to_bytes(message), (server_ip, server_port))
 
 # for each  user, store ip, addr, connection id, public_key
-async def send_session(username):
+async def send_session(target, client_username):
     "Do the process of getting the information for the peer and store it in list of users"
     connection_info = connections["server"]
     token =connection_info["token"]
 
-    global client_username
-    message = create_session_message(username, client_username, token)
+    message = create_session_message(target, client_username, token)
 
     response_message = await send_message(connection_info["connection"], message)
     if response_message["command"] != "ACK":
@@ -80,16 +87,17 @@ async def send_session(username):
     # get the info from message body
     info = parse_headers(response_message["data"].decode().split())
 
-    if username in users:
+    if target in users:
         # update this user with this information
-        users[username].update(info)
+        users[target].update(info)
     else:
-        users[username] = info.copy()
+        users[target] = info.copy()
         users["pending_messages"] = []
     return info["ip"], info["port"], info["public_key"] 
 
 
-async def send_message_to_user(user, message):
+async def send_message_to_user(server_name,user, message):
+    users = socket_assignment.users
     "Will send a message object to a given user if they are online, or add to pending messages if they are offline."
     if "connection_id" in users[user]:
         conn_id = users[user]["connection_id"]
@@ -98,5 +106,9 @@ async def send_message_to_user(user, message):
         #user is offline, store message for later delivery
         if "pending_messages" not in users[user]:
             users[user]["pending_messages"] = []
+        message = message.copy()
+        if "data" in message:
+           message["data"] = message["data"].decode()
         users[user]["pending_messages"].append(message)
+        store_users(server_name, users)
 

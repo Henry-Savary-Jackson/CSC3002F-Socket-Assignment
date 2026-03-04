@@ -1,14 +1,14 @@
 
 from socket_assignment.utils.net import close, async_udp_client
 import base64
-from socket_assignment import connections , users, unacked_messages
+import socket_assignment
+from socket_assignment import connections ,  unacked_messages
 from socket_assignment.utils.exceptions import ServerError
 from socket_assignment.utils.protocol import create_download_response_tcp, create_ack_message
 from socket_assignment.client.client_sending import send_message, send_message_udp, send_message_to_user
 from socket_assignment.utils.protocol import AUTH_TOKEN_HEADER_NAME
-from socket_assignment import media
-from socket_assignment.server import group_chats
-from socket_assignment.storage import add_new_media
+
+from socket_assignment.storage import add_new_media, store_message_in_chat, store_groups
 
 def check_message_is_reply(conn ,message):
     command = message["command"]
@@ -38,6 +38,9 @@ def check_if_token_is_valid(conn_id, message, user_id):
         raise ServerError(conn_info["connection"], message, "Wrong authentication token!")
 
 async def handle_download_server(conn_id,message):
+    users = socket_assignment.users
+    media = socket_assignment.media
+
     conn = connections[conn_id]["connection"]
 
     headers = message["headers"]
@@ -73,9 +76,9 @@ async def handle_download_server(conn_id,message):
         response =  create_download_response_tcp(message, media[media_id]) 
         await send_message(conn, response,awaitable=False)
 
+async def handle_chat_message_server(server_name,conn_id ,message, group_chats):
+    users = socket_assignment.users
 
-
-async def handle_chat_message_server(conn_id ,message):
     conn_info = connections[conn_id]
     conn = conn_info["connection"]
      #check if chat_id is specified
@@ -100,11 +103,17 @@ async def handle_chat_message_server(conn_id ,message):
         if "filename" not in headers:
             raise ServerError(conn, message, "Missing filename header")
         filename = headers["filename"]
-        media_id = add_new_media(message["data"], filename, mimetype)
+        media_id = add_new_media(message["data"], filename, mimetype, media)
         message["data"] = media_id.encode()
         headers["content_length"] = len(message["data"])
     #send message to all members in the group except the sender
+
+    store_message_in_chat(group_id, message, group_chats)
+    store_groups(server_name,group_chats)
+
     for user in group_chats[group_id]["members"]:
         if user != sender:
             #check if user is online
-            await send_message_to_user(user,message)
+            await send_message_to_user(server_name,user,message)
+    
+    await send_message(conn, create_ack_message(message), awaitable=False)
