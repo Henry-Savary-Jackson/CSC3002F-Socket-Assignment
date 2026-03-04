@@ -13,7 +13,7 @@ from socket_assignment.client import unacked_messages, client_chats
 from socket_assignment.client.client_sending import send_session ,send_message,send_pending_messages
 from socket_assignment.utils.protocol import parse , create_challenge_message, create_ack_message, create_download_response_tcp
 from socket_assignment.security.auth import create_challenge, authentication_flow_server
-from socket_assignment import connections, media
+from socket_assignment import connections, media, users
 from socket_assignment.server import  disconnect_server
 from socket_assignment.server.message_handling import handle_download_server,  check_message_is_reply
 
@@ -36,9 +36,8 @@ async def handle_direct_message_peer(conn ,message):
 
    store_message_in_chat(sender, message, client_chats)
 
-
-   if (mimetype == "text/plain"):
-      print(f"New message!: {data.decode()}")
+   if mimetype == "text/plain":
+      print(f"\nNew message from {sender}!: {data.decode()}\n")
    else:
       if "filename" not in headers:
          raise ServerError(conn, message, "Must give a filename in headers.")
@@ -46,11 +45,10 @@ async def handle_direct_message_peer(conn ,message):
       filename = headers["filename"]
       media_id = add_new_media(data, filename,mimetype)
       reply_data = media_id.encode()
+      print(f"\n New file sent by {sender}!")
 
    ack_msg = create_ack_message(message, data=reply_data)
    await send_message(conn, ack_msg, awaitable=False)
-
-
 
 @server_exceptions_handled
 async def handle_message_peer(conn_id,message):
@@ -74,7 +72,7 @@ async def handle_message_peer(conn_id,message):
 
       # find user
       # get from server if not found 
-      await authentication_flow_server(conn, message, server_type="PEER")
+      await authentication_flow_server(conn_id, message, server_type="PEER")
 
       if "user_id" in connections[conn_id]:
          user_id = connections[conn_id]["user_id"]
@@ -97,24 +95,59 @@ async def listen_peer(conn_id):
    try:
       async for message in recv_message(conn):
          # is this method
-         await handle_message_peer(conn_id, message) 
+         asyncio.create_task( handle_message_peer(conn_id, message) )
    except ConnectionError as e:
       print(f"Error:{e}") 
    except BlockingIOError as be:
       print(f"Blocking Error:{be}")
    finally:
-      print(f"Done with {conn.getsockname()}")
+      if "user_id" in connections[conn_id]:
+         print(f"Done with {connections[conn_id]["user_id"]}'s peer connection.")
+      else:
+         print(f"Done with connection {conn_id}")
       close(conn)
 
 
+def create_peer_socket_client(username):
+   assert username in users
+   peer_sock = create_socket()
 
-async def run_peer():
+   user_info = users[username]
+
+   assert "ip" in user_info
+   assert "port" in user_info
+   assert "udp_port" in user_info
+
+   conn_id  = str(uuid4())
+   connections[conn_id] = { "connection": peer_sock, "user_id": username}
+   user_info["connection_id"] = conn_id
+
+   return conn_id
+
+
+
+def bind_peer_socket():
    global peer_tcp_port
    sock = create_socket()
-   sock.bind(("0.0.0.0", peer_tcp_port))
-   sock.listen(100)
+   sock.bind(("0.0.0.0", 0))
+   peer_tcp_port = sock.getsockname()[1]
+   return sock
 
-   async for conn, addr in get_connections(sock):
-      conn_id = str(uuid4())
-      connections[conn_id] = { "connection":conn} 
-      asyncio.create_task(listen_peer(conn_id))
+
+async def run_peer(sock):
+   sock.listen(100)
+   print("Running tcp port", peer_tcp_port)
+   try :
+      async for conn, addr in get_connections(sock):
+         conn_id = str(uuid4())
+         connections[conn_id] = { "connection":conn} 
+         asyncio.create_task(listen_peer(conn_id))
+
+   except asyncio.CancelledError as e:
+      print("cancelled peer")
+   except Exception as e:
+      print(e)
+   except InterruptedError as e:
+      print(e)
+   finally:
+      sock.close()

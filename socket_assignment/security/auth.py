@@ -1,10 +1,12 @@
 
+import asyncio
 import random
 from uuid import uuid4
 import nacl 
 import base64
 from socket_assignment import users, connections
 from socket_assignment.client.client_sending import send_session, send_message
+from socket_assignment.utils.net import create_socket, connect
 from socket_assignment.utils.protocol import create_message, AUTH_TOKEN_HEADER_NAME,create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
 
@@ -58,7 +60,7 @@ async def authentication_flow_server(conn_id,connect_msg, server_type="SERVER"):
         connection_info = connections[user["connection_id"]]
         assert "token" in connection_info
         token =  connection_info["token"]
-        ack_response =create_ack_message(connect_msg, base64.b64decode(token)) 
+        ack_response =create_ack_message(connect_msg, token=base64.b64decode(token)) 
         await send_message(conn,ack_response,awaitable=False)
         return
 
@@ -107,7 +109,7 @@ async def authenticate_flow_client(conn_id, username, signing_key, verify_key, p
         "udp_port": udp_port
     })
     challenge_msg = await send_message(conn, connect_msg, awaitable=True)
-    print("Received challenge",challenge_msg)
+    print("Received challenge message!")
     if challenge_msg["command"] != "CHALLENGE":
         print("Expected CHALLENGE, got", challenge_msg["command"])
         return False
@@ -119,39 +121,29 @@ async def authenticate_flow_client(conn_id, username, signing_key, verify_key, p
     if ack["command"] == "ACK":
 
         token = ack["headers"][AUTH_TOKEN_HEADER_NAME]
-        connections[conn_id]["client_token"]  = token
+        connections[conn_id]["token"]  = token
         print("Authentication successful")
         return True
     else:
         print("Authentication failed")
         return False
 
-async def connect_to_peer(username, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
-    assert username in users
-
-    peer_sock = create_socket()
-
-    user_info = users[username]
-
-    assert "ip" in user_info
-    assert "port" in user_info
-    assert "udp_port" in user_info
 
 
-    tcp_port = user_info["port"]
-    udp = udp_port["port"]
+async def connect_to_peer(target, client_username, signing_key,verify_key, user_tcp_port, user_udp_port):
 
+    user_info = users[target]
+    conn_id = user_info["connection_id"]
+    
+    assert conn_id in connections
+    assert "connection" in connections[conn_id]
 
-    await connect(peer_sock, user_info["ip"], user_info["port"])
-    conn_id  = str(uuid4())
-    connections[conn_id] = { "connection": peer_sock, "user_id": username}
-    result = await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
-    if not result:
-        del connections[conn_id]
-        return None
+    sock = connections[conn_id]["connection"]
 
-    user_info["connection_id"] = conn_id
+    try :
+        await connect(sock, user_info["ip"], user_info["port"] )
 
-    return conn_id
-    # start listening as a peer on this new socket
+        return await authenticate_flow_client(conn_id, client_username,signing_key, verify_key, user_tcp_port, user_udp_port )
+    except ConnectionError, OSError:
+        return False
 

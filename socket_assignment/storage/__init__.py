@@ -1,4 +1,4 @@
-from socket_assignment import media
+from socket_assignment import media, connections, users
 import json
 import base64
 import nacl
@@ -17,6 +17,10 @@ def add_new_media( data, filename, mimetype ):
     media[media_id] = {"data":base64.b64encode(data).decode(), "filename":filename, "mimetype":mimetype }
     return media_id
 
+def delete_connection(conn_id):
+    user_id = connections[conn_id]["user_id"]
+    connections.pop(conn_id) 
+    users.pop(user_id)
 
 def store_client_messages(messages):
     dump_to_json_file(messages, CLIENT_CHATS_PATH)

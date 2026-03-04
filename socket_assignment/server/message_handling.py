@@ -8,6 +8,7 @@ from socket_assignment.client.client_sending import send_message, send_message_u
 from socket_assignment.utils.protocol import AUTH_TOKEN_HEADER_NAME
 from socket_assignment import media
 from socket_assignment.server import group_chats
+from socket_assignment.storage import add_new_media
 
 def check_message_is_reply(conn ,message):
     command = message["command"]
@@ -74,15 +75,34 @@ async def handle_download_server(conn_id,message):
 
 
 
-async def handle_chat_message_server(conn ,message):
+async def handle_chat_message_server(conn_id ,message):
+    conn_info = connections[conn_id]
+    conn = conn_info["connection"]
      #check if chat_id is specified
     headers = message["headers"]
     if "chat_id" not in headers:
         raise ServerError(conn, message, "chat_id is not specified!")
     if "sender" not in headers: 
         raise ServerError(conn, message, "Missing sender header!")
-    group_id = message["headers"]["chat_id"]
-    sender = message["headers"]["sender"]
+
+    # remove the authentication token the client sent
+    headers.pop(AUTH_TOKEN_HEADER_NAME)
+
+    group_id = headers["chat_id"]
+    if group_id not in group_chats:
+        raise ServerError(conn, message, f"Group with id {group_id} doesn't exist!")
+    sender = headers["sender"]
+    if sender not in users:
+        raise ServerError(conn, message, f"User {sender} doesn't exist!")
+
+    mimetype = headers["mimetype"]
+    if mimetype != "text/plain":
+        if "filename" not in headers:
+            raise ServerError(conn, message, "Missing filename header")
+        filename = headers["filename"]
+        media_id = add_new_media(message["data"], filename, mimetype)
+        message["data"] = media_id.encode()
+        headers["content_length"] = len(message["data"])
     #send message to all members in the group except the sender
     for user in group_chats[group_id]["members"]:
         if user != sender:

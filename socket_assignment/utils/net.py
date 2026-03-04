@@ -23,8 +23,14 @@ async def recvall(conn):
         yield data
 
 def create_socket():
-    return socket.socket()
+    sock =  socket.socket()
+    sock.setblocking(False)
+    return sock 
     
+def bind_udp_port(sock):
+    sock.bind(("0.0.0.0", 0))
+    port = sock.getsockname()[1]
+    return port
 
 def bind_server(sock, port):
     sock.bind(("0.0.0.0",port))
@@ -48,9 +54,12 @@ async def get_connections(sock):
 
 async def recv(conn, n):
     "Asynchornously gives the next chunk of data from a tcp socket. "
-    data = await asyncio.get_event_loop().sock_recv(conn, n)
-    if not data:
-        return None
+    data=  bytes ()
+    while len(data) < n:
+        packet = await asyncio.get_event_loop().sock_recv(conn, n-len(data))
+        if not packet:
+            return None
+        data += packet
     return data
 
         

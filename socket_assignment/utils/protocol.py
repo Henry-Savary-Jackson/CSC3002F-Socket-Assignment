@@ -9,6 +9,13 @@ MESSAGE_ID_HEADER_NAME = "message_no"
 REPLY_HEADER_NAME = "reply_to"
 
 
+def encode_dict_in_header_fmt(dict_data):
+    """use this to turn a dictionary into a string of format
+    key:value
+    key1:value1
+    """
+    return "\n".join([ f"{key}:{value}" for key,value in dict_data.items() ])
+
 def parse_headers(lines):
     """given the lines of headers in format
     key1:value1
@@ -45,16 +52,19 @@ def parse(data_bytes):
 
     data = bytes()
     for i in range(cur_line+1, len(lines)):
-        data += base64.b64decode(lines[i])
+        data += base64.b64decode(lines[i].encode("ascii"))
 
     return command, headers, data
 
 def encode(command, headers, data=None):
     "Used to encode a mesage,its headers and data into text to be sent over a socket"
 
-    headers_text = "\n".join([ f"{key}:{value}" for key,value in headers.items() ])
+    headers_text = encode_dict_in_header_fmt(headers) 
 
-    b64_data =base64.b64encode(data).decode() if data else ""
+    b64_data =base64.b64encode(data).decode("ascii") if data else ""
+
+    if data:
+        assert base64.b64decode(b64_data.encode("ascii")) == data
 
     message_bytes =f"{command.upper()}\n\n{headers_text}\n\n{b64_data}".encode()
     
@@ -105,7 +115,7 @@ def create_connect_message(sender, public_key=None, ip=None, tcp_port=None,udp_p
     return create_message("CONNECT", headers) 
 
 def create_session_message(other_user,current_user, token):
-    headers = {"sender":current_user, "other":other_user}
+    headers = {"sender":current_user, "target":other_user}
     return create_message("SESSION", headers, token=token)
 
 def create_challenge_message(original,challenge):
@@ -131,9 +141,12 @@ def create_reject_message(original,username, inviter,chat_id, token):
     return create_message("REJECT", {"sender":username, "chat_id":chat_id, "inviter":inviter }, reply=original["message_id"], token=token)
 
 def create_download_response_tcp(original, media):
-    data = base64.b64decode(media["data"].encode())
+    data = media["data"].encode()
     headers = {"content_length" :len(data), "mimetype":media["mimetype"], "filename":media["filename"]}
     return create_ack_message(original, data=data,headers=headers)
+
+def create_download_message_tcp(original, media_id, token):
+    return create_message("DOWNLOAD", {"media_id":media_id}, token=token )
 
 
 def create_invite_message(sender,other_username, chat_id,token):
@@ -145,7 +158,7 @@ def create_chat_message(sender, chat_id, data,mimetype, token, filename=None):
         headers["filename"] = filename
     return create_message("MESSAGE", headers, data=data, token=token) 
 
-def create_direct_message(sender, other_user, data,mimetype,token):
+def create_direct_message(sender, other_user, data,mimetype,token, filename=None):
     headers = {"recipient":other_user, "mimetype":mimetype , "content_length":len(data), "sender":sender}
     if filename:
         headers["filename"] = filename

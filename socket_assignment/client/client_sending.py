@@ -10,7 +10,7 @@ from socket_assignment.utils.net import send, recv_message
 import nacl
 from mimetypes import guess_type
 from socket_assignment import users, connections,unacked_messages
-from socket_assignment.utils.protocol import create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
+from socket_assignment.utils.protocol import create_session_message,create_join_message,parse, parse_headers , encode,message_to_bytes, bytes_to_message, create_message, create_invite_message
 import socket
 import uuid
 import nacl.signing
@@ -30,6 +30,7 @@ async def send_pending_messages(user_id):
     conn = connections[conn_id]["connection"]
     pending_messages  = user_info["pending_messages"] if "pending_messages" in user_info else []
     while pending_messages:
+        # while there are still unsent messages,send the first one
         message = pending_messages.pop(0)
         await send_message(conn, message, awaitable=False)
 
@@ -58,18 +59,23 @@ async def send_message(conn ,message, awaitable=True):
 
     # this returns a future, so that the caller can await the response from the remote connection
 
-async def send_message_udp(udp_sock, message, server_name, server_port):
-    await asyncio.get_event_loop().sock_sendto(udp_sock, message_to_bytes(message), (server_name, server_port))
+async def send_message_udp(udp_sock, message, server_ip, server_port):
+    "Send a message object via UDP to a given server ip adress and port"
+    await asyncio.get_event_loop().sock_sendto(udp_sock, message_to_bytes(message), (server_ip, server_port))
 
 # for each  user, store ip, addr, connection id, public_key
 async def send_session(username):
     "Do the process of getting the information for the peer and store it in list of users"
-    connection_info  = connections["server"]
-    token =connection_info["client_token"]
+    connection_info = connections["server"]
+    token =connection_info["token"]
 
+    global client_username
     message = create_session_message(username, client_username, token)
 
     response_message = await send_message(connection_info["connection"], message)
+    if response_message["command"] != "ACK":
+        print(f"Error:{response_message["headers"]["cause"]}")
+        return None, None, None 
 
     # get the info from message body
     info = parse_headers(response_message["data"].decode().split())
@@ -84,7 +90,7 @@ async def send_session(username):
 
 
 async def send_message_to_user(user, message):
-    "Will send a message to user if they are online, or add to pending messages if they are offline."
+    "Will send a message object to a given user if they are online, or add to pending messages if they are offline."
     if "connection_id" in users[user]:
         conn_id = users[user]["connection_id"]
         await send_message(connections[conn_id]["connection"], message, awaitable=False)

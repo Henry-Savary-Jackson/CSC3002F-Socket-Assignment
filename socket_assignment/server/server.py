@@ -5,7 +5,7 @@ from socket_assignment import users, connections, unacked_messages
 from socket_assignment.server import group_chats,  MAX_CONNECTIONS, disconnect_server, server_sock
 from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
-from socket_assignment.utils.protocol import create_message, create_ack_message, create_error_message, AUTH_TOKEN_HEADER_NAME
+from socket_assignment.utils.protocol import create_message, create_ack_message,encode_dict_in_header_fmt, create_error_message, AUTH_TOKEN_HEADER_NAME
 from socket_assignment.security.auth import authentication_flow_server
 from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
 from socket_assignment.client.client_sending import send_message , send_message_to_user
@@ -41,6 +41,8 @@ async def handle_message_main_server(conn_id, message):
             raise ServerError(conn, message, "Missing target, chat_id, or sender!")
         if target not in users:
             raise ServerError(conn, message, f"User {target} does not exist!")
+        if chat_id not in group_chats:
+            raise ServerError(conn, message, f"Chat {chat_id} does not exist!")
 
         # send invite notification to target
         await send_message_to_user(target, message) 
@@ -112,9 +114,21 @@ async def handle_message_main_server(conn_id, message):
         members.add(sender)
 
         await send_message(conn, create_ack_message(message, headers={"chat_id":chat_id}), awaitable=False)
-
+    elif command == "SESSION":
+        headers = message["headers"]
+        if "target" not in headers:
+            raise ServerError(conn, message, "Missing target header!")
+        target = headers["target"]
+        if target not in users:
+            raise ServerError(conn, message, f"User {target} doesn't exist!")
+        target_info = users[target]
+        properties = ["ip", "port", "udp_port", "public_key"] # properties to send the clinet regarding this target
+        output_info = { prop:target_info[prop] for prop in properties }
+        data = encode_dict_in_header_fmt(output_info).encode()
+        ack_msg = create_ack_message(message, data=data)
+        await send_message(conn, ack_msg, awaitable=False)
     else:
-        raise ServerError(conn, message, f"Unknown command {command}")
+        raise ServerError(conn, message, f"Unknown command {command}.")
 
 async def handle_new_conn(conn_id):
     assert conn_id in connections
@@ -125,7 +139,11 @@ async def handle_new_conn(conn_id):
     except (ConnectionError, BlockingIOError) as e:
         print(f"Connection error: {e}")
     finally:
-        print(f"Done with {conn}")
+        conn_info = connections[conn_id]
+        if "user_id" in conn_info:
+            print(f"Done with {conn_info["user_id"]}\'s connection.")
+        else :
+            print(f"Done with {conn_id} connection.")
         await disconnect_server(conn_id)
 
 
