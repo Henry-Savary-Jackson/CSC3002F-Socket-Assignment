@@ -5,14 +5,14 @@ from socket_assignment.server import server_sock
 import asyncio
 
 if __name__ == "__main__":
-    program_type = input("Server(S)/Client(C)?:\n").upper()[:1]
-    if program_type == "C":
-        try :
+    try :
+        program_type = input("Server(S)/Client(C)?:\n").upper()[:1]
+        if program_type == "C":
             asyncio.run(run_client())
-        except KeyboardInterrupt as e:
-            print("Interrupted, closing.")
-    elif program_type == "S":
-        try:
-            asyncio.run(run_server())
-        except Exception:
-            close(server_sock)
+        elif program_type == "S":
+            try:
+                asyncio.run(run_server())
+            except Exception:
+                close(server_sock)
+    except KeyboardInterrupt as e:
+        print("Interrupted, closing.")

@@ -19,13 +19,13 @@ import uuid
 import nacl.signing
 import nacl.encoding
 from socket_assignment.peer.peer import listen_peer , create_peer_socket_client
-from socket_assignment.security.auth import generate_keypair, authenticate_flow_client, connect_to_peer
+from socket_assignment.security.auth import generate_keypair, authenticate_flow_client
 from socket_assignment.server.message_handling import check_message_is_reply, send_message_to_user
 from socket_assignment.storage import load_groups, load_media, load_users,store_message_in_chat, delete_connection, store_signing_key, load_sign_verify_key, find_chat_with_name
-from socket_assignment.client.client_sending import send_message , send_session
+from socket_assignment.client.client_sending import send_message , send_session, send_pending_messages
 from socket_assignment.utils.exceptions import  server_exceptions_handled 
 from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_udp_port,bind_server
-from socket_assignment.storage import store_groups
+from socket_assignment.storage import store_groups, store_users
 from socket_assignment.utils.protocol import create_newchat_message,create_message,create_chat_message, create_direct_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
 
 
@@ -110,6 +110,10 @@ async def handle_message_as_client(conn_id, message):
 async def command_loop(conn_id, username):
     users = socket_assignment.users
     group_chats = socket_assignment.group_chats
+    peer_tcp_port = socket_assignment.peer.peer_tcp_port
+    udp_port = socket_assignment.client.udp_port
+    client_signing_key = socket_assignment.client.client_signing_key
+    client_verifier_key = socket_assignment.client.client_verifier_key
 
 
     conn_info  = connections[conn_id]
@@ -148,6 +152,9 @@ async def command_loop(conn_id, username):
                     continue
                 target, chat_name = parts[1], parts[2]
                 chat_id = find_chat_with_name(chat_name, group_chats)
+                if not chat_id:
+                    print(f"No such chat with name {chat_name} was found.")
+                    continue
 
                 msg = create_invite_message(username, target, chat_id,chat_name, connections[conn_id]["token"])
                 resp = await send_message(conn, msg)
@@ -168,7 +175,7 @@ async def command_loop(conn_id, username):
                         msg = create_join_message(latest, username, inviter,chat_id, conn_info["token"])
                         response = await send_message(conn,msg)
                         if response["command"] == "ACK":
-                            group_chats[chat_id] =  {"messages":[], "name":chat_name }
+                            group_chats[chat_id] =  {"messages":[], "name":chat_name  }
                             
                             store_groups(client_username,group_chats)
                             print(f"Joined chat {chat_id}")
@@ -210,7 +217,7 @@ async def command_loop(conn_id, username):
                 msg = create_direct_message(username, other , data, mimetype, "", filename=filename)
                 resp = await send_message_to_user(username,other, msg)
                 if resp is None:
-                    print("User is offline.")
+                    print("User is offline, sent into pending messages.")
                     continue 
                 if resp["command"] == "ACK":
                     print("\nSucessfully received!\n")
@@ -223,8 +230,9 @@ async def command_loop(conn_id, username):
                     continue
                 target = parts[1]
 
-                if target not in users:
+                if target not in users or "ip" not in users[target] or "port" not in users[target]:
                     ip,port, pubkey = await send_session(target, username)
+                    store_users(username, users)
                     if not ip  or not port or not pubkey:
                         print(f"User {target} doesn't exsit!")
                         continue
@@ -235,13 +243,26 @@ async def command_loop(conn_id, username):
                 client_sock = connections[target_conn_id]["connection"]
 
 
-                asyncio.create_task(listen_peer(target_conn_id))
+                assert "ip" in target_info 
+                assert "port" in target_info 
 
+                ip = target_info["ip"] 
+                tcp_port = target_info["port"]
 
-                result =  await connect_to_peer(target, client_username, client_signing_key, client_verifier_key,peer_tcp_port,udp_port)
+                await connect(client_sock, ip,tcp_port)
+
+                asyncio.create_task(listen_peer(username,target_conn_id))
+
+                result = await authenticate_flow_client(target_conn_id, username,client_signing_key, client_verifier_key, peer_tcp_port, udp_port )
                 if not result:
                     print("\nError, could not connect to peer!")
                     delete_connection(target_conn_id, connections, users)
+                
+                target_info["connection_id"] = target_conn_id 
+                connections[target_conn_id]["user_id"] = target
+                 
+                await send_pending_messages(username, target)
+
                 print(f"\nConnected to {target}\n!")
 
             elif parts[0] == "/create":

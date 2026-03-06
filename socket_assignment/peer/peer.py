@@ -20,6 +20,7 @@ from socket_assignment.server.message_handling import handle_download_server,  c
 
 async def handle_direct_message_peer(peer_name,conn ,message):
    media = socket_assignment.media
+   group_chats = socket_assignment.group_chats
 
    headers = message["headers"]
    reply_data = None
@@ -36,8 +37,8 @@ async def handle_direct_message_peer(peer_name,conn ,message):
    data = message["data"]
    mimetype = headers["mimetype"]
 
-   store_message_in_chat(sender, message, client_chats)
-   store(peer_name, client_chats)
+   store_message_in_chat(sender, message, group_chats)
+   store_groups(peer_name, group_chats)
 
    if mimetype == "text/plain":
       print(f"\nNew message from {sender}!: {data.decode()}\n")
@@ -78,7 +79,7 @@ async def handle_message_peer(current_username,conn_id,message):
 
       if "user_id" in connections[conn_id]:
          user_id = connections[conn_id]["user_id"]
-         await send_pending_messages(user_id)
+         await send_pending_messages(current_username,user_id)
             
    elif command == "MESSAGE":
       await handle_direct_message_peer(current_username,conn, message)
@@ -111,6 +112,7 @@ async def listen_peer(current_username,conn_id):
 
 
 def create_peer_socket_client(username):
+   users = socket_assignment.users
    assert username in users
    peer_sock = create_socket()
 

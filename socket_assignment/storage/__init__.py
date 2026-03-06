@@ -3,6 +3,7 @@ import socket_assignment
 import os
 import json
 import base64
+from copy import deepcopy
 import nacl
 from uuid import uuid4
 
@@ -13,8 +14,17 @@ PRIVATE_KEY_PATH = "privkey.bin"
 
 json_settings = {"indent":4}
 
+
+def convert_message_for_storage(message):
+    message = deepcopy(message) 
+    if "data" in message and type(message["data"]) == bytes:
+        message["data"] = base64.b64encode(message["data"]).decode()
+    return message
+
 def find_chat_with_name(name, chats):
     for chat_id in chats:
+        if "name" not in chats[chat_id]:
+            continue
         if chats[chat_id]["name"] == name:
             return chat_id
 
@@ -25,7 +35,6 @@ def add_new_media(server_name, data, filename, mimetype, media ):
     return media_id
 
 def delete_connection(conn_id, connections, users):
-
     user_id = connections[conn_id]["user_id"]
     connections.pop(conn_id) 
     users.pop(user_id)
@@ -45,10 +54,11 @@ def store_media(server_name,media):
     dump_to_json_file(media, f"{server_name}-{MEDIA_PATH}")
 
 def store_groups(server_name,groups):
-    groups = groups.copy()
+    groups = deepcopy(groups) 
     for group_id in groups:
-        
-        groups[group_id]["members"] = list(groups[group_id]["members"]) 
+        group = groups[group_id]
+        if "members" in group:
+            group["members"] = list(group["members"]) 
 
     dump_to_json_file(groups,f"{server_name}-{CHATS_PATH}")
     
@@ -69,9 +79,7 @@ def load_from_json_file( path):
 
 
 def store_message_in_chat(chat_id,new_message,group_chats):
-    new_message = new_message.copy()
-    if new_message["data"]:
-        new_message["data"] = new_message["data"].decode()
+    new_message = convert_message_for_storage(new_message) 
     client_chat = group_chats[chat_id] if chat_id in group_chats else None
     if not client_chat:
         client_chat = {"chat_id":chat_id, "messages": []}
@@ -85,15 +93,16 @@ def load_users(server_name):
 def load_groups(server_name):
     groups =  load_from_json_file(f"{server_name}-{CHATS_PATH}")
     for group_id in groups:
-        assert "members" in groups[group_id]
-        groups[group_id]["members"] = set(groups[group_id]["members"])
+        group = groups[group_id]
+        if "members" in  group:
+            group["members"] = set(group["members"])
     return groups
 
 def load_media(server_name):
     return load_from_json_file(f"{server_name}-{MEDIA_PATH}")
 
-def store_users(prefix,users):
-    users = users.copy()
+def store_users(current_username,users):
+    users = deepcopy(users)
     for username in users:
         user = users[username]
         "ip" in user and user.pop("ip")
@@ -101,6 +110,6 @@ def store_users(prefix,users):
         "udp_port" in user and user.pop("udp_port")
         "connection_id" in user and user.pop("connection_id")
 
-    dump_to_json_file(users, f"{prefix}-{USERS_PATH}")
+    dump_to_json_file(users, f"{current_username}-{USERS_PATH}")
     
 

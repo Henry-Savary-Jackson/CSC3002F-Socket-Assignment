@@ -132,6 +132,8 @@ async def handle_message_main_server(server_name,conn_id, message):
         if target not in users:
             raise ServerError(conn, message, f"User {target} doesn't exist!")
         target_info = users[target]
+        if "connection_id" not in target_info:
+            raise ServerError(conn, message, f"User {user} is offline.")
         properties = ["ip", "port", "udp_port", "public_key"] # properties to send the clinet regarding this target
         output_info = { prop:target_info[prop] for prop in properties }
         data = encode_dict_in_header_fmt(output_info).encode()

@@ -51,33 +51,12 @@ async def handle_download_server(conn_id,message):
     if media_id not in media:
         raise ServerError(conn, message, "Media doesn't exist.")
     file_data = base64.b64decode(media[media_id]["data"].encode())
-    if "stream" in headers and headers["stream"]:
-        # TODO: handle streaming
-        # create ack messages for each chunk of data
-        if "sender" not in headers:
-            raise ServerError(conn, message, "Missing sender header in download request!")
-        sender = headers["sender"]
-        user_info = users[sender]
-        assert "ip" in user_info
-        ip = user_info["ip"] 
-        assert "udp_port" in user_info
-        udp_port = user_info["udp_port"]
-        udp_sock = async_udp_client()
-        index = 0
-        chunk_num = 0 
-        CHUNK_SIZE = 4096
-        while index < len(file_data):
-            chunk = file_data[index: min(index+CHUNK_SIZE, len(file_data))]
-            index += CHUNK_SIZE 
-            chunk_num +=  1
-            ack_message = create_ack_message(message, headers={"chunk_no": chunk_num, "content_length":len(chunk)},data=chunk)
-            await send_message_udp(udp_sock, ack_message, ip, udp_port)
-    else:
-        response =  create_download_response_tcp(message, media[media_id]) 
-        await send_message(conn, response,awaitable=False)
+    response =  create_download_response_tcp(message, media[media_id]) 
+    await send_message(conn, response, awaitable=False)
 
 async def handle_chat_message_server(server_name,conn_id ,message, group_chats):
     users = socket_assignment.users
+    media = socket_assignment.media
 
     conn_info = connections[conn_id]
     conn = conn_info["connection"]
@@ -103,7 +82,7 @@ async def handle_chat_message_server(server_name,conn_id ,message, group_chats):
         if "filename" not in headers:
             raise ServerError(conn, message, "Missing filename header")
         filename = headers["filename"]
-        media_id = add_new_media(message["data"], filename, mimetype, media)
+        media_id = add_new_media(server_name,message["data"], filename, mimetype, media)
         message["data"] = media_id.encode()
         headers["content_length"] = len(message["data"])
     #send message to all members in the group except the sender

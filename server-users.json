@@ -6,20 +6,11 @@
     },
     "user": {
         "public_key": "A9lNBVqy8vD4szjcP9mJaRy12MAYOAXofAZdzaSsQks=",
-        "username": "user",
-        "pending_messages": [
-            {
-                "message_id": "361cd816-147e-4194-b928-af9f9fe7b3eb",
-                "headers": {
-                    "sender": "user3",
-                    "chat_id": "4aa54761-082b-4332-b1f6-6937c98b2dde",
-                    "chat_name": "hellochat",
-                    "target": "user",
-                    "message_no": "361cd816-147e-4194-b928-af9f9fe7b3eb"
-                },
-                "data": "",
-                "command": "INVITE"
-            }
-        ]
+        "username": "user"
+    },
+    "user2": {
+        "public_key": "DP/D1708jwnFnOc1MRAcdd9qmS5orLG0ImP0bZYur84=",
+        "username": "user2",
+        "pending_messages": []
     }
 }
