@@ -134,6 +134,10 @@ async def command_loop(conn_id, username):
             Send a direct message to a user via a peer to peer connection.
         -/peer <username>
             Initiate a peer-to-peer connection to the given user.
+        -/chats 
+            List all the group chats you are in.
+        -/quit
+            Disconnect from the server
         -/help 
             Print help message
     """
@@ -287,6 +291,8 @@ async def command_loop(conn_id, username):
                 msg = create_message("DISCONNECT", headers={"sender": username})
                 await send_message(conn, msg, awaitable=False)
                 break
+            elif parts[0] == "/chats":
+                print(*[group["name"] for group in group_chats.values() if "name" in group] ,sep="\n")
             elif parts[0] == "/help":
                 print(help_msg)
             else:
@@ -318,7 +324,7 @@ async def client_listener(conn_id):
         
 
 async def run_client():
-    server_host = "localhost"
+    server_host = "127.0.0.1"
     server_port = 5000
     username = input("Enter your username: ")
 
