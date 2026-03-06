@@ -1,16 +1,10 @@
 {
-    "user3": {
-        "public_key": "A+L+fGCRRoN0LO/QoBpdAcrseh6aBK64BLk4QHZSUhQ=",
-        "username": "user3",
-        "pending_messages": []
-    },
-    "user": {
-        "public_key": "A9lNBVqy8vD4szjcP9mJaRy12MAYOAXofAZdzaSsQks=",
-        "username": "user"
+    "user1": {
+        "public_key": "29hqN38dRUoyK+JfDNVhYCFe7I3xwx7HLXD279U6HLo=",
+        "username": "user1"
     },
     "user2": {
-        "public_key": "DP/D1708jwnFnOc1MRAcdd9qmS5orLG0ImP0bZYur84=",
-        "username": "user2",
-        "pending_messages": []
+        "public_key": "BKGixwuVKlrKMqM9btatJvE5xG37vgEvU8vA8xCZ/KA=",
+        "username": "user2"
     }
 }

@@ -58,7 +58,7 @@ async def authentication_flow_server(server_name,conn_id,connect_msg,server_type
         udp_port = int(headers["udp_port"])
 
         users[sender] = { "public_key":public_key_b64, "username":sender, "ip": ip, "port":port, "udp_port":udp_port}
-        print("Storing")
+        # print("Storing")
         # get from server
 
         # create new user

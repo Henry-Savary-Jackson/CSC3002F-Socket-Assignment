@@ -101,12 +101,12 @@ async def send_session(target, client_username):
     return info["ip"], info["port"], info["public_key"] 
 
 
-async def send_message_to_user(server_name,user, message):
+async def send_message_to_user(server_name,user, message, awaitable=False):
     users = socket_assignment.users
     "Will send a message object to a given user if they are online, or add to pending messages if they are offline."
     if "connection_id" in users[user]:
         conn_id = users[user]["connection_id"]
-        return await send_message(connections[conn_id]["connection"], message, awaitable=False)
+        return await send_message(connections[conn_id]["connection"], message, awaitable=awaitable)
     else:
         #user is offline, store message for later delivery
         if "pending_messages" not in users[user]:

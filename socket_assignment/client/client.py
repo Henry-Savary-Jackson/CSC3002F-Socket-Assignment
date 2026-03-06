@@ -101,7 +101,8 @@ async def handle_message_as_client(conn_id, message):
         sender = headers["sender"]
         chat_id = headers["chat_id"]
         print(f"\nUser {sender} joined chat {chat_id}!")
-        group_chats[chat_id]["members"].add(sender)
+        if "members" in chat_id:
+            group_chats[chat_id]["members"].add(sender)
         store_groups(client_username, group_chats)
     elif cmd == "REJECT":
         print(f"\nUser {message["headers"]["sender"]} rejected chat invite {message["headers"]["chat_id"]}!")
@@ -179,12 +180,11 @@ async def command_loop(conn_id, username):
                         msg = create_join_message(latest, username, inviter,chat_id, conn_info["token"])
                         response = await send_message(conn,msg)
                         if response["command"] == "ACK":
-                            group_chats[chat_id] =  {"messages":[], "name":chat_name  }
-                            
+                            group_chats[chat_id] =  {"messages":[], "name":chat_name, "members": set()  }
                             store_groups(client_username,group_chats)
-                            print(f"Joined chat {chat_id}")
+                            print(f"\nJoined chat {chat_id}")
                         else:
-                            print("Join failed")
+                            print("\nJoin failed")
                     else:
                         msg = create_reject_message(latest, username, inviter,chat_id, conn_info["token"])
                         await send_message(conn, msg, awaitable=False)
@@ -219,7 +219,7 @@ async def command_loop(conn_id, username):
                 data, mimetype, filename = await ask_for_message(other)
 
                 msg = create_direct_message(username, other , data, mimetype, "", filename=filename)
-                resp = await send_message_to_user(username,other, msg)
+                resp = await send_message_to_user(username,other, msg, awaitable=True) # make this ture in order to get a response
                 if resp is None:
                     print("User is offline, sent into pending messages.")
                     continue 

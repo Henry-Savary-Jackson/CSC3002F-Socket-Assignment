@@ -93,6 +93,6 @@ async def handle_chat_message_server(server_name,conn_id ,message, group_chats):
     for user in group_chats[group_id]["members"]:
         if user != sender:
             #check if user is online
-            await send_message_to_user(server_name,user,message)
+            await send_message_to_user(server_name,user,message, awaitable=False)
     
     await send_message(conn, create_ack_message(message), awaitable=False)
