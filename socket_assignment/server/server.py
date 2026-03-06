@@ -20,11 +20,16 @@ async def send_error(conn, original_msg, explanation):
 
 @server_exceptions_handled
 async def handle_message_main_server(server_name,conn_id, message):
+    """This function is the message handler for the central server. 
+    The server_name is used as a prefix when storing to a json file. 
+    The conn_id is the connection id of the socket to the client sending the message."""
+
+    # global dictionaries
     users = socket_assignment.users
     group_chats = socket_assignment.group_chats
 
-    assert conn_id in connections
-
+    if conn_id not in connections:
+        return
 
     conn = connections[conn_id]["connection"]
     if check_message_is_reply(conn, message):
@@ -66,7 +71,7 @@ async def handle_message_main_server(server_name,conn_id, message):
         chat_id = headers.get("chat_id")
         sender = headers.get("sender")
         inviter = headers.get("inviter")
-        # get rid of authentication token
+        # get rid of authentication token from the message before sending
         headers.pop(AUTH_TOKEN_HEADER_NAME)
 
         if not chat_id or not sender or not inviter:
@@ -94,7 +99,8 @@ async def handle_message_main_server(server_name,conn_id, message):
         chat_id = headers.get("chat_id")
         sender = headers.get("sender")
         inviter = headers.get("inviter")
-        headers.pop(AUTH_TOKEN_HEADER_NAME)
+        headers.pop(AUTH_TOKEN_HEADER_NAME) # remove the authentication token the original client sent
+        # 
         if not chat_id or not sender or not inviter:
             raise ServerError(conn, message,"Missing chat_id, sender, or inviter!")
         if inviter not in users:
@@ -102,7 +108,7 @@ async def handle_message_main_server(server_name,conn_id, message):
         if chat_id not in group_chats:
             raise ServerError(conn, message,f"Group chat {chat_id} doesn't exist!" ) 
 
-        # tell the inviter they rejected
+        # tell the inviter they rejected the invite
         await send_message_to_user(server_name,inviter, message)
 
         # tell invitee that the message was acknowledged
@@ -125,28 +131,36 @@ async def handle_message_main_server(server_name,conn_id, message):
 
         await send_message(conn, create_ack_message(message, headers={"chat_id":chat_id}), awaitable=False)
     elif command == "SESSION":
+        # This is to handle whenever a client require information
+        # about a user's peer server (ip, port) to initiate a peer-to-peer session
         headers = message["headers"]
         if "target" not in headers:
             raise ServerError(conn, message, "Missing target header!")
+
         target = headers["target"]
         if target not in users:
             raise ServerError(conn, message, f"User {target} doesn't exist!")
+
         target_info = users[target]
         if "connection_id" not in target_info:
             raise ServerError(conn, message, f"User {user} is offline.")
-        properties = ["ip", "port", "udp_port", "public_key"] # properties to send the clinet regarding this target
+
+        properties = ["ip", "port", "udp_port", "public_key"] # properties to send the client regarding this target
         output_info = { prop:target_info[prop] for prop in properties }
-        data = encode_dict_in_header_fmt(output_info).encode()
+        data = encode_dict_in_header_fmt(output_info).encode() # turns this info into a string
         ack_msg = create_ack_message(message, data=data)
         await send_message(conn, ack_msg, awaitable=False)
     else:
         raise ServerError(conn, message, f"Unknown command {command}.")
 
 async def handle_new_conn(server_name,conn_id):
+    """This function handles a new connections
+    The conn_id identifies  the new connection being handled"""
     assert conn_id in connections
     conn = connections[conn_id]["connection"]
     try:
         async for message in recv_message(conn):
+            # create a new task to handle it
             asyncio.create_task(handle_message_main_server(server_name,conn_id, message))
     except (ConnectionError, BlockingIOError) as e:
         print(f"Connection error: {e}")
@@ -155,20 +169,24 @@ async def handle_new_conn(server_name,conn_id):
         if "user_id" in conn_info:
             print(f"Done with {conn_info["user_id"]}\'s connection.")
         else :
+            # if there is no user authenticated on this socket
             print(f"Done with {conn_id} connection.")
         disconnect_server(conn_id)
 
 
 async def run_server(host='localhost', port=5000):
+    """This is the main code for running the server."""
 
     server_name = "server"
 
+    # load data from permanent storage
     socket_assignment.users = load_users(server_name)
     socket_assignment.media = load_media(server_name)
     socket_assignment.group_chats = load_groups(server_name)
     
 
     sock = socket_assignment.server.server_sock 
+
     try :
         sock.bind((host, port))
         sock.listen(100)
@@ -184,7 +202,9 @@ async def run_server(host='localhost', port=5000):
                     pass
                 close(conn)
                 continue
-            print(f"New connection from {addr}, active: {len(connections)}")
+            print(f"New connection from {addr}, active: {len(connections)+1}")
+
+            # add new connection in dictionary of connections
             conn_id = str(uuid4())
             connections[conn_id] = { "connection":conn} 
             asyncio.create_task(handle_new_conn(server_name,conn_id))
@@ -197,10 +217,3 @@ async def run_server(host='localhost', port=5000):
         print(e)
     finally:
         close(sock)
-
-if __name__ == "__main__":
-    import sys
-    port = 5000
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    asyncio.run(run_server(port=port))

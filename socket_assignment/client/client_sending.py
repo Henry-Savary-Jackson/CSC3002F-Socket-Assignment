@@ -18,12 +18,13 @@ import socket
 import uuid
 import nacl.signing
 import nacl.encoding
-from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_server
+from socket_assignment.utils.net import create_socket, connect, recv_message, close
 from socket_assignment.utils.protocol import create_message,create_chat_message, create_direct_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
 
 async def send_pending_messages(current_username,user_id):
+    "Send all the pendings messages of a user, if any, once they have connected."
+
     users = socket_assignment.users
-    "Send all the pendings messages, if any to a user once they have connected."
     user_info  = users[user_id]
     if "connection_id" not in user_info:
         return
@@ -77,7 +78,7 @@ async def send_message_udp(udp_sock, message, server_ip, server_port):
 
 # for each  user, store ip, addr, connection id, public_key
 async def send_session(target, client_username):
-    "Do the process of getting the information for the peer and store it in list of users"
+    "Do the process of getting the information for the peer and store it in list of users."
     connection_info = connections["server"]
     users = socket_assignment.users
     token =connection_info["token"]
@@ -96,12 +97,18 @@ async def send_session(target, client_username):
         # update this user with this information
         users[target].update(info)
     else:
+        # create a new user entry
         users[target] = info.copy()
         users[target]["pending_messages"] = []
     return info["ip"], info["port"], info["public_key"] 
 
 
 async def send_message_to_user(server_name,user, message, awaitable=False):
+    """This function sends a message to user. If the user is online, it will send it via TCP.
+    Otherwise, it stores the message in the pending queue for the user. The user will recieve it when
+    they are online again.
+    awaitable=True means wait for the user to sned a reply and return it.
+    awaitable=False means send it and don't bother waiting for the reply, if any comes."""
     users = socket_assignment.users
     "Will send a message object to a given user if they are online, or add to pending messages if they are offline."
     if "connection_id" in users[user]:

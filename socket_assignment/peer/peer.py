@@ -19,6 +19,9 @@ from socket_assignment.server.message_handling import handle_download_server,  c
 
 
 async def handle_direct_message_peer(peer_name,conn ,message):
+   """This function is for when a peer handles a MESSAGE frame from another user via peer-to-peer"""
+
+   #globals
    media = socket_assignment.media
    group_chats = socket_assignment.group_chats
 
@@ -37,6 +40,7 @@ async def handle_direct_message_peer(peer_name,conn ,message):
    data = message["data"]
    mimetype = headers["mimetype"]
 
+   # store in permanent storage
    store_message_in_chat(sender, message, group_chats)
    store_groups(peer_name, group_chats)
 
@@ -47,15 +51,19 @@ async def handle_direct_message_peer(peer_name,conn ,message):
          raise ServerError(conn, message, "Must give a filename in headers.")
       mimetype = headers["mimetype"]
       filename = headers["filename"]
+      # save the file to local media
       media_id = add_new_media(peer_name,data, filename,mimetype, media)
       reply_data = media_id.encode()
       print(f"\n New file sent by {sender}!")
+      print(f"Got data, first 300 bytes!:{data[:min(len(data),300)]}")
 
    ack_msg = create_ack_message(message, data=reply_data)
    await send_message(conn, ack_msg, awaitable=False)
 
 @server_exceptions_handled
 async def handle_message_peer(current_username,conn_id,message):
+   """This function is the main message handler that a client's peer server uses.
+   conn_id is the connection_id of the socket that has sent this message."""
    # check if this is just a reply to a previous message, in which case
    # dont bother handling it, it will be handled anyway
    assert conn_id in connections
@@ -73,8 +81,6 @@ async def handle_message_peer(current_username,conn_id,message):
    if command == "CONNECT":
       # begin authentication flow
 
-      # find user
-      # get from server if not found 
       await authentication_flow_server(current_username,conn_id, message, server_type="PEER")
 
       if "user_id" in connections[conn_id]:

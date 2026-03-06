@@ -1,3 +1,8 @@
+"""
+This is a utility file for methods regarding storing messages, users,etc... into their dictionaries.
+As well as storing these global dictionaries into json files.
+"""
+
 from socket_assignment import   users
 import socket_assignment
 import os

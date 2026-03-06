@@ -16,6 +16,7 @@ CHALLENGE_SIZE = 128
 TOKEN_SIZE = 128
 
 def generate_keypair():
+    """Randomly generate a new private public keypair."""
     signing_key = nacl.signing.SigningKey.generate()
     verify_key = signing_key.verify_key
     return signing_key, verify_key
@@ -27,6 +28,13 @@ def get_auth_token():
     return base64.b64encode(random.randbytes(TOKEN_SIZE))
 
 async def authentication_flow_server(server_name,conn_id,connect_msg,server_type="SERVER"):
+    """Handles the flow of messages the server has to send to authenticate a user.
+    This consists of creating a random string and challenging the user to prove their identity by signing it.
+
+    Do note that both central servers and peer use this when a user sends a CONNECT frame.
+    enter server_type="PEER" if this is beign run for a peer.
+    
+    Will raise ServerError if anything goes wrong with the authentication. This is expected to be handled"""
     users = socket_assignment.users
 
     conn = connections[conn_id]["connection"]

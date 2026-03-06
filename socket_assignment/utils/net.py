@@ -7,6 +7,7 @@ MAX_CONN = 100
 SERVER_PORT = 5000
 
 async def recv_message(conn):
+    """Continuosly yields messages in our protocol as dictionaries."""
     async for message_bytes in recvall(conn):
         yield bytes_to_message(message_bytes)
 
@@ -16,13 +17,14 @@ async def recvall(conn):
         length_data  = await recv(conn ,4)
         if length_data is None:
             break
-        length = int.from_bytes(length_data, byteorder="big")
+        length = int.from_bytes(length_data, byteorder="big") # big endian is used
         data =   await recv(conn ,length)
         if data is None:
             break
         yield data
 
 def create_socket():
+    """Creates a new non-blocing socket"""
     sock =  socket.socket()
     sock.setblocking(False)
     return sock 
@@ -32,10 +34,8 @@ def bind_udp_port(sock):
     port = sock.getsockname()[1]
     return port
 
-def bind_server(sock, port):
-    sock.bind(("0.0.0.0",port))
-
 async def connect(sock, address, port):
+    """Asynchronously connects to a TCP socket on the given address and port using the given socket."""
     sock.setblocking(False)
     await asyncio.get_event_loop().sock_connect(sock, (address, port))
 

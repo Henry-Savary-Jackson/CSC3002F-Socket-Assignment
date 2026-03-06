@@ -24,7 +24,7 @@ from socket_assignment.server.message_handling import check_message_is_reply, se
 from socket_assignment.storage import load_groups, load_media, load_users,store_message_in_chat, delete_connection, store_signing_key, load_sign_verify_key, find_chat_with_name
 from socket_assignment.client.client_sending import send_message , send_session, send_pending_messages
 from socket_assignment.utils.exceptions import  server_exceptions_handled 
-from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_udp_port,bind_server
+from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_udp_port
 from socket_assignment.storage import store_groups, store_users
 from socket_assignment.utils.protocol import create_newchat_message,create_message,create_chat_message, create_direct_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
 
@@ -86,7 +86,7 @@ async def handle_message_as_client(conn_id, message):
             if response["command"] == "ACK":
                 data = response["data"]
                 # show first 300 bytes of data
-                print(f"Got data!:{data[:min(len(data),300)]}")
+                print(f"Got data, first 300 bytes!:{data[:min(len(data),300)]}")
             else:
                 # ERROR!! show cause
                print(response["headers"]["cause"]) 
@@ -95,20 +95,27 @@ async def handle_message_as_client(conn_id, message):
         headers = message["headers"]
         sender = headers["sender"]
         chat_id = headers["chat_id"]
-        print(f"\nNew invite to chat {chat_id} from {sender}!")
+        chat_name = headers["chat_name"]
+        print(f"\nNew invite to chat \"{chat_name}\" from {sender}!")
         pending_invites.append(message)
     elif cmd == "JOIN":
         sender = headers["sender"]
         chat_id = headers["chat_id"]
-        print(f"\nUser {sender} joined chat {chat_id}!")
+        chat_name = group_chats[chat_id]["name"]
+        print(f"\nUser {sender} joined chat {chat_name}!")
         if "members" in chat_id:
             group_chats[chat_id]["members"].add(sender)
         store_groups(client_username, group_chats)
     elif cmd == "REJECT":
-        print(f"\nUser {message["headers"]["sender"]} rejected chat invite {message["headers"]["chat_id"]}!")
+        sender = headers["sender"]
+        chat_id = headers["chat_id"]
+        chat_name = group_chats[chat_id]["name"]
+        print(f"\nUser {sender} rejected chat invite {sender}!")
 
 
 async def command_loop(conn_id, username):
+    """This handles user input on the client."""
+    # get all of the global data
     users = socket_assignment.users
     group_chats = socket_assignment.group_chats
     peer_tcp_port = socket_assignment.peer.peer_tcp_port
@@ -164,7 +171,7 @@ async def command_loop(conn_id, username):
                 msg = create_invite_message(username, target, chat_id,chat_name, connections[conn_id]["token"])
                 resp = await send_message(conn, msg)
                 if resp["command"] == "ACK":
-                    print(f"Invite sent to {target} for chat {chat_id}")
+                    print(f"Invite sent to {target} for chat \"{chat_name}\"")
                 else:
                     print(f"Error: {resp["headers"]["cause"]}")
             elif parts[0] == "/invites":
@@ -181,14 +188,14 @@ async def command_loop(conn_id, username):
                         response = await send_message(conn,msg)
                         if response["command"] == "ACK":
                             group_chats[chat_id] =  {"messages":[], "name":chat_name, "members": set()  }
-                            store_groups(client_username,group_chats)
-                            print(f"\nJoined chat {chat_id}")
+                            store_groups(username,group_chats)
+                            print(f"\nJoined chat \"{chat_name}\"")
                         else:
                             print("\nJoin failed")
                     else:
                         msg = create_reject_message(latest, username, inviter,chat_id, conn_info["token"])
                         await send_message(conn, msg, awaitable=False)
-                        print(f"Rejected invite for chat {chat_id}")
+                        print(f"Rejected invite for chat \"{chat_name}\"")
 
                 else:
                     print("No pending invites,")
@@ -218,6 +225,7 @@ async def command_loop(conn_id, username):
 
                 data, mimetype, filename = await ask_for_message(other)
 
+                # TODO: get rid of the token header, it is redundant as authentication is done on the socket connection
                 msg = create_direct_message(username, other , data, mimetype, "", filename=filename)
                 resp = await send_message_to_user(username,other, msg, awaitable=True) # make this ture in order to get a response
                 if resp is None:
@@ -246,7 +254,6 @@ async def command_loop(conn_id, username):
                 target_info = users[target]
                 client_sock = connections[target_conn_id]["connection"]
 
-
                 assert "ip" in target_info 
                 assert "port" in target_info 
 
@@ -267,7 +274,7 @@ async def command_loop(conn_id, username):
                  
                 await send_pending_messages(username, target)
 
-                print(f"\nConnected to {target}\n!")
+                print(f"\nConnected to {target}!")
 
             elif parts[0] == "/create":
                 if len(parts) < 2:

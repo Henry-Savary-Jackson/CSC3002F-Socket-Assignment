@@ -138,7 +138,7 @@ def create_join_message(original,username,inviter ,chat_id, token):
     return create_message("JOIN", {"sender":username, "chat_id":chat_id, "inviter":inviter}, reply=original["message_id"], token=token)
 
 def create_reject_message(original,username, inviter,chat_id, token):
-    return create_message("REJECT", {"sender":username, "chat_id":chat_id, "inviter":inviter }, reply=original["message_id"], token=token)
+    return create_message("REJECT", {"sender":username,"chat_id":chat_id, "inviter":inviter }, reply=original["message_id"], token=token)
 
 def create_download_response_tcp(original, media):
     data = media["data"].encode()

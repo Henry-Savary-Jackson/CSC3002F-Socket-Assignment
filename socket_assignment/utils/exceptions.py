@@ -6,7 +6,7 @@ from socket_assignment.utils.protocol import create_error_message
 
 
 class ServerError(Exception):
-    """raise this when you encounter a message that causes an error."""
+    """raise this when you encounter a message that causes an error in a message handler."""
     def __init__(self,conn, original_message, cause ):
         super().__init__(cause)
         self.msg = cause

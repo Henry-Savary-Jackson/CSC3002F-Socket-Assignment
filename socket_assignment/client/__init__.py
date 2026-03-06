@@ -11,11 +11,11 @@ server_adress = "localhost"
 
 udp_port = None
 
-udp_socket = udp_server()
+udp_socket = udp_server() # global variable for the udp socket
 
 client_username =None  # global variable for username
 client_signing_key = None # this is supposed to be a nacl.signing.SigningKey
 client_verifier_key = None # this is supposed to be a nacl.signing.SigningKey
 
-pending_invites = [] # sglobal variable tores all the pending invites the client has received
+pending_invites = [] # global variable tores all the pending invites the client has received
 

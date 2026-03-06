@@ -11,6 +11,13 @@ from socket_assignment.utils.protocol import AUTH_TOKEN_HEADER_NAME
 from socket_assignment.storage import add_new_media, store_message_in_chat, store_groups
 
 def check_message_is_reply(conn ,message):
+    """This function will check if this message is being awaited by another task as a response.
+    This is done by checking the "reply_to" header, containing the message_id of the message being replied to.
+    If it is a reply, set the result of the corresponding future that is waiting for this message
+
+    Will return True if it is a reply, in which case message handler tasks should ignore this message
+    Otherwise, treat it as a novel message.
+    """
     command = message["command"]
     message_id = message["message_id"]
     reply_to_id = message["headers"]["reply_to"] if "reply_to" in message["headers"] else None
@@ -25,7 +32,10 @@ def check_message_is_reply(conn ,message):
 
     return False
 
+
+# TODO: remove this soon, there is little need for auth tokens
 def check_if_token_is_valid(conn_id, message, user_id):
+    """Checks if the user has included the correct authentication token in a message."""
     headers = message["headers"]
     conn_info = connections[conn_id]
     assert "token" in conn_info
