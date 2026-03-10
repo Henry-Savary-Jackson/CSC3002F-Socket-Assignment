@@ -3,6 +3,7 @@ from uuid import uuid4
 import socket
 import socket_assignment
 from socket_assignment import connections
+from socket_assignment.server.online_status import online_broadcaster 
 from socket_assignment.server import   MAX_CONNECTIONS, disconnect_server
 from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
@@ -38,6 +39,10 @@ async def handle_message_main_server(server_name,conn_id, message):
     command = message["command"]
     if command == "CONNECT":
         await authentication_flow_server("server",conn_id, message)
+        conn_info =connections[conn_id]
+        username = conn_info["user_id"] if "user_id" in conn_info else None
+        if username:
+            asyncio.create_task(online_broadcaster(conn_id), name=f"{username}-online")
         if "user_id" in connections[conn_id]:
             user_id = connections[conn_id]["user_id"]
             await send_pending_messages(server_name,user_id)

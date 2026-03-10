@@ -1,4 +1,5 @@
 from socket_assignment.utils.net import close, async_udp_client
+import asyncio
 import base64
 import socket_assignment
 from socket_assignment import connections
@@ -19,6 +20,9 @@ def disconnect_server(conn_id):
     socket = connection_info["connection"]
     user_id = connection_info["user_id"] if "user_id" in connection_info else None
     if user_id and "connection_id" in users[user_id]:
+        task  = list(filter(lambda t: t.get_name()==f"{user_id}-online", asyncio.all_tasks()))
+        if task:
+            task[0].cancel()
         users[user_id].pop("connection_id")
     connections.pop(conn_id)
     close(socket)

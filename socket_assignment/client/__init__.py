@@ -9,7 +9,7 @@ from socket_assignment.storage import store_message_in_chat
 server_connection = create_socket()
 server_adress = "localhost"
 
-udp_port = None
+udp_port = None 
 
 udp_socket = udp_server() # global variable for the udp socket
 
@@ -19,3 +19,4 @@ client_verifier_key = None # this is supposed to be a nacl.signing.SigningKey
 
 pending_invites = [] # global variable tores all the pending invites the client has received
 
+online_status = dict()

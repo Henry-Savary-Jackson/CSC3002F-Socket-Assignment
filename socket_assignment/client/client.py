@@ -1,11 +1,12 @@
 import asyncio
-
+import netifaces
+import datetime
 import socket
 from pathlib import Path
 from uuid import uuid4
 import asyncio
 from socket_assignment.peer.peer import run_peer, bind_peer_socket
-from socket_assignment.client import pending_invites,  client_username, server_connection  , udp_socket, udp_port, client_signing_key, client_verifier_key
+from socket_assignment.client import pending_invites, online_status, client_username, server_connection  , udp_socket, udp_port, client_signing_key, client_verifier_key
 import base64
 from socket_assignment.utils.net import send, recv_message
 import nacl
@@ -122,7 +123,7 @@ async def command_loop(conn_id, username):
     udp_port = socket_assignment.client.udp_port
     client_signing_key = socket_assignment.client.client_signing_key
     client_verifier_key = socket_assignment.client.client_verifier_key
-
+    peer_tcp_ip  = socket_assignment.peer.peer_tcp_ip
 
     conn_info  = connections[conn_id]
     conn = conn_info["connection"]
@@ -144,6 +145,8 @@ async def command_loop(conn_id, username):
             Initiate a peer-to-peer connection to the given user.
         -/chats 
             List all the group chats you are in.
+        -/users
+            Lists all the users and their online status
         -/quit
             Disconnect from the server
         -/help 
@@ -264,7 +267,7 @@ async def command_loop(conn_id, username):
 
                 asyncio.create_task(listen_peer(username,target_conn_id))
 
-                result = await authenticate_flow_client(target_conn_id, username,client_signing_key, client_verifier_key, peer_tcp_port, udp_port )
+                result = await authenticate_flow_client(target_conn_id, username,client_signing_key, client_verifier_key,peer_tcp_ip, peer_tcp_port, udp_port )
                 if not result:
                     print("\nError, could not connect to peer!")
                     delete_connection(target_conn_id, connections, users)
@@ -302,11 +305,25 @@ async def command_loop(conn_id, username):
                 print(*[group["name"] for group in group_chats.values() if "name" in group] ,sep="\n")
             elif parts[0] == "/help":
                 print(help_msg)
+            elif parts[0] == "/users":
+                print("\n".join([f"{key}:{online_status[key]["state"]}" for key in get_online_users() ]))
             else:
                 print("Unknown command")
 
     except (asyncio.CancelledError, EOFError):
         print("\nClosing program...") 
+
+
+def get_online_users():
+    return {username:online_status[username] for username in online_status if online_status[username]["timestamp"] >= datetime.datetime.now().timestamp()-30*60*1000}
+
+async def udp_listener(sock:socket.socket):
+    loop = asyncio.get_event_loop()
+    while True:
+        data = await loop.sock_recvfrom(sock, 500)
+        # print(f"New udp message:{data[0]}")
+        username,state ,timestamp= data[0].decode().split(":")
+        online_status[username] = {"state":state, "timestamp":int(timestamp)} 
 
 # handle connection 
 async def client_listener(conn_id):
@@ -328,16 +345,37 @@ async def client_listener(conn_id):
     finally:
         print("\nDisconnected to server!")
         close(conn)
+
+
+def get_local_ip():
+    acceptable_interfaces = ["wlan0", "eth0"]
+    interfaces = netifaces.interfaces()
+    for interface in acceptable_interfaces:
+        if interface not in interfaces:
+            continue
+        interace_info = netifaces.ifaddresses(interface)
+        if netifaces.AF_INET in interace_info:
+            return interace_info[netifaces.AF_INET][0]["addr"]
         
 
 async def run_client():
-    server_host = "127.0.0.1"
+    server_host = input("Enter ip adress of server:\n") 
+    if not server_host:
+        server_host = "127.0.0.1"
     server_port = 5000
-    username = input("Enter your username: ")
 
+    ip = get_local_ip()
+    if ip :
+        print("local network I.P:",ip)
+    else:
+        print("Unable to get local I.P address, using localhost.")
+        ip = "127.0.0.1"
+
+    socket_assignment.peer.peer_tcp_ip = ip
+
+    username = input("Enter your username:\n")
     socket_assignment.client_username = username
     users = socket_assignment.users
-     
 
     new = input("New account (Y/n)?\n").upper()[:1]
     if new == "Y":
@@ -368,6 +406,8 @@ async def run_client():
 
         socket_assignment.client.udp_port = bind_udp_port(udp_socket)
         udp_port = socket_assignment.client.udp_port
+        
+        asyncio.create_task(udp_listener(udp_socket))
 
         socket_assignment.group_chats = load_groups(username)
         socket_assignment.users = load_users(username)
@@ -379,7 +419,7 @@ async def run_client():
 
         asyncio.create_task(run_peer(username,peer_socket))
 
-        success = await authenticate_flow_client(server_conn_id, username, client_signing_key,   client_verifier_key if new == "Y" else None, peer_tcp_port, udp_port)
+        success = await authenticate_flow_client(server_conn_id, username, client_signing_key,   client_verifier_key if new == "Y" else None,ip, peer_tcp_port, udp_port)
         if success:
             await command_loop(server_conn_id, username)
 

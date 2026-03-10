@@ -124,12 +124,12 @@ async def authentication_flow_server(server_name,conn_id,connect_msg,server_type
         raise ServerError(conn, authenticate_msg, "Invalid Signature!")
 
 
-async def authenticate_flow_client(conn_id, username, signing_key, verify_key, peer_tcp_port, udp_port):
+async def authenticate_flow_client(conn_id, username, signing_key, verify_key,peer_tcp_ip, peer_tcp_port, udp_port):
     try :
         conn = connections[conn_id]["connection"]
         connect_headers = {
             "sender": username,
-            "ip": "127.0.0.1",
+            "ip": peer_tcp_ip,
             "port": peer_tcp_port,
             "udp_port": udp_port
         }

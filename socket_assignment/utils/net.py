@@ -73,7 +73,7 @@ def udp_server():
     return sock
 
 async def async_udp_client():
-    client_socket = socket(socket.AF_INET, socket.SOCK_DGRAM)
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.setblocking(False)
     return  client_socket
 
