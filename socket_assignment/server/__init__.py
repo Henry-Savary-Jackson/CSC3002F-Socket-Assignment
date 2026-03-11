@@ -4,7 +4,7 @@ import base64
 import socket_assignment
 from socket_assignment import connections
 from socket_assignment.utils.exceptions import ServerError
-from socket_assignment.utils.protocol import create_download_response_tcp, create_ack_message, AUTH_TOKEN_HEADER_NAME
+from socket_assignment.utils.protocol import create_download_response_tcp, create_ack_message
 from socket_assignment.client.client_sending import send_message, send_message_udp
 from socket_assignment.utils.net import create_socket
 from socket_assignment import media

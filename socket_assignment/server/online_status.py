@@ -7,11 +7,11 @@ from socket_assignment import connections
 from socket_assignment.server import   MAX_CONNECTIONS, disconnect_server
 from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close, async_udp_client
-from socket_assignment.utils.protocol import create_message, create_ack_message,encode_dict_in_header_fmt, create_error_message, AUTH_TOKEN_HEADER_NAME
+from socket_assignment.utils.protocol import create_message, create_ack_message,encode_dict_in_header_fmt, create_error_message
 from socket_assignment.security.auth import authentication_flow_server
 from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
 from socket_assignment.client.client_sending import send_message , send_message_to_user, send_pending_messages
-from socket_assignment.server.message_handling import check_if_token_is_valid, check_message_is_reply 
+from socket_assignment.server.message_handling import  check_message_is_reply 
 from socket_assignment.storage import load_groups, load_media, load_users , store_groups
 
 

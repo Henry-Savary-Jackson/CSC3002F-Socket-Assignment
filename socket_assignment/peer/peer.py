@@ -137,6 +137,7 @@ def create_peer_socket_client(username):
 
 
 def bind_peer_socket():
+   """Crrate a new socket for a peer that is bound to a radnom port on 0.0.0.0. Listening to all incoming connections"""
    sock = create_socket()
    sock.bind(("0.0.0.0", 0))
    socket_assignment.peer.peer_tcp_port = sock.getsockname()[1]

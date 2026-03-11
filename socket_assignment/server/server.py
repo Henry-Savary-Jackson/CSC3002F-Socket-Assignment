@@ -7,11 +7,11 @@ from socket_assignment.server.online_status import online_broadcaster
 from socket_assignment.server import   MAX_CONNECTIONS, disconnect_server
 from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
-from socket_assignment.utils.protocol import create_message, create_ack_message,encode_dict_in_header_fmt, create_error_message, AUTH_TOKEN_HEADER_NAME
+from socket_assignment.utils.protocol import create_message, create_ack_message,encode_dict_in_header_fmt, create_error_message
 from socket_assignment.security.auth import authentication_flow_server
 from socket_assignment.utils.exceptions import server_exceptions_handled, ServerError
 from socket_assignment.client.client_sending import send_message , send_message_to_user, send_pending_messages
-from socket_assignment.server.message_handling import check_if_token_is_valid, check_message_is_reply 
+from socket_assignment.server.message_handling import  check_message_is_reply 
 from socket_assignment.storage import load_groups, load_media, load_users , store_groups
 
 
@@ -55,7 +55,6 @@ async def handle_message_main_server(server_name,conn_id, message):
         target = headers.get("target")
         chat_id = headers.get("chat_id")
         sender = headers.get("sender")
-        headers.pop(AUTH_TOKEN_HEADER_NAME)
 
         if not target or not chat_id or not sender:
             raise ServerError(conn, message, "Missing target, chat_id, or sender!")
@@ -76,8 +75,6 @@ async def handle_message_main_server(server_name,conn_id, message):
         chat_id = headers.get("chat_id")
         sender = headers.get("sender")
         inviter = headers.get("inviter")
-        # get rid of authentication token from the message before sending
-        headers.pop(AUTH_TOKEN_HEADER_NAME)
 
         if not chat_id or not sender or not inviter:
             raise ServerError(conn, message,"Missing chat_id or sender or inviter!" ) 
@@ -104,7 +101,6 @@ async def handle_message_main_server(server_name,conn_id, message):
         chat_id = headers.get("chat_id")
         sender = headers.get("sender")
         inviter = headers.get("inviter")
-        headers.pop(AUTH_TOKEN_HEADER_NAME) # remove the authentication token the original client sent
         # 
         if not chat_id or not sender or not inviter:
             raise ServerError(conn, message,"Missing chat_id, sender, or inviter!")

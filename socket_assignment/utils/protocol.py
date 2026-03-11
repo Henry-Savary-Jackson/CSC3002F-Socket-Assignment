@@ -4,7 +4,6 @@ from nacl.signing import SigningKey, VerifyKey
 import socket
 
 
-AUTH_TOKEN_HEADER_NAME = "auth"
 MESSAGE_ID_HEADER_NAME = "message_no"
 REPLY_HEADER_NAME = "reply_to"
 
@@ -70,13 +69,12 @@ def encode(command, headers, data=None):
     
     return len(message_bytes).to_bytes(4, byteorder="big") + message_bytes
 
-def create_message(command,headers=None, data=None,reply=None,token=None):
+def create_message(command,headers=None, data=None,reply=None):
     """Create a message object with the given parameters.
 
     reply is the id of the message this message is reply to. Only give this if this is a reply to another message.
     otherwise, leave this None.
 
-    token is used for requests that need authentication, such as MESSAGE or INVITE
     """
 
     headers = headers or dict()
@@ -84,8 +82,6 @@ def create_message(command,headers=None, data=None,reply=None,token=None):
     output = {"command":command, "headers":headers  }
     if reply:
         headers[REPLY_HEADER_NAME] = reply
-    if token:
-        headers[AUTH_TOKEN_HEADER_NAME] = token
 
     output["message_id"] = str(uuid4())
     headers[MESSAGE_ID_HEADER_NAME] = output["message_id"]
@@ -114,9 +110,9 @@ def create_connect_message(sender, public_key=None, ip=None, tcp_port=None,udp_p
         headers["public_key"] = public_key
     return create_message("CONNECT", headers) 
 
-def create_session_message(other_user,current_user, token):
+def create_session_message(other_user,current_user):
     headers = {"sender":current_user, "target":other_user}
-    return create_message("SESSION", headers, token=token)
+    return create_message("SESSION", headers)
 
 def create_challenge_message(original,challenge):
     headers = {"sender": original["headers"]["sender"]  }
@@ -134,35 +130,35 @@ def create_error_message(original, cause):
     headers = {"cause":cause, REPLY_HEADER_NAME:original["message_id"]}
     return create_message("ERROR", headers)
 
-def create_join_message(original,username,inviter ,chat_id, token):
-    return create_message("JOIN", {"sender":username, "chat_id":chat_id, "inviter":inviter}, reply=original["message_id"], token=token)
+def create_join_message(original,username,inviter ,chat_id):
+    return create_message("JOIN", {"sender":username, "chat_id":chat_id, "inviter":inviter}, reply=original["message_id"])
 
-def create_reject_message(original,username, inviter,chat_id, token):
-    return create_message("REJECT", {"sender":username,"chat_id":chat_id, "inviter":inviter }, reply=original["message_id"], token=token)
+def create_reject_message(original,username, inviter,chat_id):
+    return create_message("REJECT", {"sender":username,"chat_id":chat_id, "inviter":inviter }, reply=original["message_id"])
 
 def create_download_response_tcp(original, media):
     data = media["data"].encode()
     headers = {"content_length" :len(data), "mimetype":media["mimetype"], "filename":media["filename"]}
     return create_ack_message(original, data=data,headers=headers)
 
-def create_download_message_tcp(original, media_id, token):
-    return create_message("DOWNLOAD", {"media_id":media_id}, token=token )
+def create_download_message_tcp(original, media_id):
+    return create_message("DOWNLOAD", {"media_id":media_id} )
 
 
-def create_invite_message(sender,other_username, chat_id, chat_name,token):
-    return create_message("INVITE", {"sender":sender,"chat_id":chat_id,"chat_name":chat_name, "target":other_username}, token=token ) 
+def create_invite_message(sender,other_username, chat_id, chat_name):
+    return create_message("INVITE", {"sender":sender,"chat_id":chat_id,"chat_name":chat_name, "target":other_username} ) 
 
-def create_chat_message(sender, chat_id, data,mimetype, token, filename=None):
+def create_chat_message(sender, chat_id, data,mimetype,  filename=None):
     headers = {"chat_id":chat_id, "mimetype":mimetype , "content_length":len(data), "sender":sender}
     if filename:
         headers["filename"] = filename
-    return create_message("MESSAGE", headers, data=data, token=token) 
+    return create_message("MESSAGE", headers, data=data) 
 
-def create_direct_message(sender, other_user, data,mimetype,token, filename=None):
+def create_direct_message(sender, other_user, data,mimetype, filename=None):
     headers = {"recipient":other_user, "mimetype":mimetype , "content_length":len(data), "sender":sender}
     if filename:
         headers["filename"] = filename
-    return create_message("MESSAGE", headers, data=data, token=token) 
+    return create_message("MESSAGE", headers, data=data) 
 
-def create_newchat_message(sender, chat_name, token):
-    return create_message("CREATE", {"chat_name":chat_name, "sender":sender}, token=token)
+def create_newchat_message(sender, chat_name):
+    return create_message("CREATE", {"chat_name":chat_name, "sender":sender})

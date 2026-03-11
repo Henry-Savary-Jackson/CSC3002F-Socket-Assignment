@@ -6,7 +6,6 @@ from socket_assignment import connections ,  unacked_messages
 from socket_assignment.utils.exceptions import ServerError
 from socket_assignment.utils.protocol import create_download_response_tcp, create_ack_message
 from socket_assignment.client.client_sending import send_message, send_message_udp, send_message_to_user
-from socket_assignment.utils.protocol import AUTH_TOKEN_HEADER_NAME
 
 from socket_assignment.storage import add_new_media, store_message_in_chat, store_groups
 
@@ -32,20 +31,6 @@ def check_message_is_reply(conn ,message):
 
     return False
 
-
-# TODO: remove this soon, there is little need for auth tokens
-def check_if_token_is_valid(conn_id, message, user_id):
-    """Checks if the user has included the correct authentication token in a message."""
-    headers = message["headers"]
-    conn_info = connections[conn_id]
-    assert "token" in conn_info
-    true_token = conn_info["token"] 
-    if  AUTH_TOKEN_HEADER_NAME not in headers or not headers[AUTH_TOKEN_HEADER_NAME]:
-        raise ServerError(conn_info["connection"], message, "Missing authentication token!")
-
-    msg_token = headers[AUTH_TOKEN_HEADER_NAME]
-    if msg_token != true_token:
-        raise ServerError(conn_info["connection"], message, "Wrong authentication token!")
 
 async def handle_download_server(conn_id,message):
     users = socket_assignment.users
@@ -76,9 +61,6 @@ async def handle_chat_message_server(server_name,conn_id ,message, group_chats):
         raise ServerError(conn, message, "chat_id is not specified!")
     if "sender" not in headers: 
         raise ServerError(conn, message, "Missing sender header!")
-
-    # remove the authentication token the client sent
-    headers.pop(AUTH_TOKEN_HEADER_NAME)
 
     group_id = headers["chat_id"]
     if group_id not in group_chats:

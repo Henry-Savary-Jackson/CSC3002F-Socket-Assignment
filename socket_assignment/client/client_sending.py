@@ -19,7 +19,7 @@ import uuid
 import nacl.signing
 import nacl.encoding
 from socket_assignment.utils.net import create_socket, connect, recv_message, close
-from socket_assignment.utils.protocol import create_message,create_chat_message, create_direct_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
+from socket_assignment.utils.protocol import create_message,create_chat_message, create_direct_message, create_authentication_message
 
 async def send_pending_messages(current_username,user_id):
     "Send all the pendings messages of a user, if any, once they have connected."
@@ -81,17 +81,19 @@ async def send_session(target, client_username):
     "Do the process of getting the information for the peer and store it in list of users."
     connection_info = connections["server"]
     users = socket_assignment.users
-    token =connection_info["token"]
 
-    message = create_session_message(target, client_username, token)
+    message = create_session_message(target, client_username)
 
     response_message = await send_message(connection_info["connection"], message)
     if response_message["command"] != "ACK":
         print(f"Error:{response_message["headers"]["cause"]}")
         return None, None, None 
 
+
     # get the info from message body
     info = parse_headers(response_message["data"].decode().split())
+    info["port"] = int(info["port"] )
+    info["udp_port"] = int(info["udp_port"])
 
     if target in users:
         # update this user with this information

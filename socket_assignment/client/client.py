@@ -27,7 +27,7 @@ from socket_assignment.client.client_sending import send_message , send_session,
 from socket_assignment.utils.exceptions import  server_exceptions_handled 
 from socket_assignment.utils.net import create_socket, connect, recv_message, close, bind_udp_port
 from socket_assignment.storage import store_groups, store_users
-from socket_assignment.utils.protocol import create_newchat_message,create_message,create_chat_message, create_direct_message, create_authentication_message, AUTH_TOKEN_HEADER_NAME
+from socket_assignment.utils.protocol import create_newchat_message,create_message,create_chat_message, create_direct_message, create_authentication_message
 
 
 async def get_input_async(*args):
@@ -82,7 +82,7 @@ async def handle_message_as_client(conn_id, message):
             print(f"\nGot media from {sender}, (media-id: {media_id})\n")
             print("Downloading...\n")
             # download the media
-            download_msg = create_download_message_tcp(message, media_id, conn_info["token"] )
+            download_msg = create_download_message_tcp(message, media_id )
             response= await send_message(conn, download_msg)
             if response["command"] == "ACK":
                 data = response["data"]
@@ -171,7 +171,7 @@ async def command_loop(conn_id, username):
                     print(f"No such chat with name {chat_name} was found.")
                     continue
 
-                msg = create_invite_message(username, target, chat_id,chat_name, connections[conn_id]["token"])
+                msg = create_invite_message(username, target, chat_id,chat_name)
                 resp = await send_message(conn, msg)
                 if resp["command"] == "ACK":
                     print(f"Invite sent to {target} for chat \"{chat_name}\"")
@@ -187,7 +187,7 @@ async def command_loop(conn_id, username):
                     print(f"New pending invite to  chat \"{chat_name}\" from {inviter}.")
                     decision = (await get_input_async("(A)ccept/(R)eject?\n")).upper()[:1]
                     if decision == "A":
-                        msg = create_join_message(latest, username, inviter,chat_id, conn_info["token"])
+                        msg = create_join_message(latest, username, inviter,chat_id )
                         response = await send_message(conn,msg)
                         if response["command"] == "ACK":
                             group_chats[chat_id] =  {"messages":[], "name":chat_name, "members": set()  }
@@ -196,7 +196,7 @@ async def command_loop(conn_id, username):
                         else:
                             print("\nJoin failed")
                     else:
-                        msg = create_reject_message(latest, username, inviter,chat_id, conn_info["token"])
+                        msg = create_reject_message(latest, username, inviter,chat_id)
                         await send_message(conn, msg, awaitable=False)
                         print(f"Rejected invite for chat \"{chat_name}\"")
 
@@ -210,7 +210,7 @@ async def command_loop(conn_id, username):
                 chat_name = parts[1]
                 chat_id = find_chat_with_name(chat_name, group_chats)
                 data, mimetype, filename = await ask_for_message(chat_id)
-                msg = create_chat_message(username, chat_id, data, mimetype, conn_info["token"], filename=filename)
+                msg = create_chat_message(username, chat_id, data, mimetype, filename=filename)
                 response = await send_message(conn, msg)
                 if response["command"] == "ACK":
                     print("Successfully sent")
@@ -228,8 +228,7 @@ async def command_loop(conn_id, username):
 
                 data, mimetype, filename = await ask_for_message(other)
 
-                # TODO: get rid of the token header, it is redundant as authentication is done on the socket connection
-                msg = create_direct_message(username, other , data, mimetype, "", filename=filename)
+                msg = create_direct_message(username, other , data, mimetype, filename=filename)
                 resp = await send_message_to_user(username,other, msg, awaitable=True) # make this ture in order to get a response
                 if resp is None:
                     print("User is offline, sent into pending messages.")
@@ -285,7 +284,7 @@ async def command_loop(conn_id, username):
                     continue
             
                 chat_name = parts[1]
-                msg = create_newchat_message(username,chat_name,conn_info["token"]  ) 
+                msg = create_newchat_message(username,chat_name  ) 
                 response = await send_message(conn, msg)
                 resp_headers = response["headers"]
                 if response["command"] == "ACK":

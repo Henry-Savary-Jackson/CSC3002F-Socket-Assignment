@@ -8,12 +8,11 @@ import socket_assignment
 from socket_assignment import connections
 from socket_assignment.client.client_sending import send_session, send_message
 from socket_assignment.utils.net import create_socket, connect
-from socket_assignment.utils.protocol import create_message, AUTH_TOKEN_HEADER_NAME,create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
+from socket_assignment.utils.protocol import create_message, create_challenge_message, create_authentication_message, create_session_message, create_ack_message, create_error_message, create_connect_message
 from socket_assignment.utils.exceptions import ServerError
 from socket_assignment.storage import store_users
 
 CHALLENGE_SIZE = 128
-TOKEN_SIZE = 128
 
 def generate_keypair():
     """Randomly generate a new private public keypair."""
@@ -23,9 +22,6 @@ def generate_keypair():
 
 def create_challenge():
     return base64.b64encode(random.randbytes(CHALLENGE_SIZE))
-
-def get_auth_token():
-    return base64.b64encode(random.randbytes(TOKEN_SIZE))
 
 async def authentication_flow_server(server_name,conn_id,connect_msg,server_type="SERVER"):
     """Handles the flow of messages the server has to send to authenticate a user.
@@ -81,9 +77,7 @@ async def authentication_flow_server(server_name,conn_id,connect_msg,server_type
     if "connection_id" in user and user["connection_id"]:
         # simply reply
         connection_info = connections[user["connection_id"]]
-        assert "token" in connection_info
-        token =  connection_info["token"]
-        ack_response =create_ack_message(connect_msg, token=base64.b64decode(token)) 
+        ack_response =create_ack_message(connect_msg) 
         await send_message(conn,ack_response,awaitable=False)
         return
 
@@ -100,23 +94,17 @@ async def authentication_flow_server(server_name,conn_id,connect_msg,server_type
         # verify signature
         original = verifier_key.verify(data)
 
-        #sucessfully veirified
-        token = get_auth_token()
-        # create connection object
+        #sucessfully verified
 
         user["connection_id"] = conn_id  # link the user to its connections
         
         user["ip"] = headers["ip"]
-        user["port"] = headers["port"]
-        user["udp_port"] = headers["udp_port"]
+        user["port"] = int(headers["port"])
+        user["udp_port"] = int(headers["udp_port"])
         # store info about this connection in order to be used later
-        connections[conn_id].update({
-            "user_id":sender,
-            "token": token.decode()
+        connections[conn_id]["user_id"] = sender
 
-        })
-
-        success_response = create_ack_message(authenticate_msg, token=token.decode())
+        success_response = create_ack_message(authenticate_msg)
         await send_message(conn, success_response, awaitable=False)
 
     except nacl.exceptions.BadSignatureError as e:
@@ -147,9 +135,6 @@ async def authenticate_flow_client(conn_id, username, signing_key, verify_key,pe
                                 data=signature, reply=challenge_msg["message_id"])
         ack = await send_message(conn, auth_msg, awaitable=True)
         if ack["command"] == "ACK":
-
-            token = ack["headers"][AUTH_TOKEN_HEADER_NAME]
-            connections[conn_id]["token"]  = token
             print("Authentication successful.\n")
             return True
         else:
