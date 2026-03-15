@@ -127,7 +127,8 @@ async def authenticate_flow_client(conn_id, username, signing_key, verify_key,pe
         challenge_msg = await send_message(conn, connect_msg, awaitable=True)
         print("Received challenge message!")
         if challenge_msg["command"] != "CHALLENGE":
-            print("Expected CHALLENGE, got", challenge_msg["command"])
+            print(challenge_msg)
+            print("Error:", challenge_msg["headers"]["cause"])
             return False
         challenge_data = challenge_msg["data"]
         signature = signing_key.sign(challenge_data)

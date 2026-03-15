@@ -4,7 +4,7 @@ import socket
 import socket_assignment
 from socket_assignment import connections
 from socket_assignment.server.online_status import online_broadcaster 
-from socket_assignment.server import   MAX_CONNECTIONS, disconnect_server
+from socket_assignment.server import   MAX_CONNECTIONS, disconnect_server, SERVER_PORT
 from socket_assignment.server.message_handling import handle_download_server, handle_chat_message_server
 from socket_assignment.utils.net import create_socket, get_connections, send, recv_message, close
 from socket_assignment.utils.protocol import create_message, create_ack_message,encode_dict_in_header_fmt, create_error_message
@@ -175,7 +175,7 @@ async def handle_new_conn(server_name,conn_id):
         disconnect_server(conn_id)
 
 
-async def run_server(host='localhost', port=5000):
+async def run_server(host='localhost', port=SERVER_PORT):
     """This is the main code for running the server."""
 
     server_name = "server"

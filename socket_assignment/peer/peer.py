@@ -45,7 +45,7 @@ async def handle_direct_message_peer(peer_name,conn ,message):
    store_groups(peer_name, group_chats)
 
    if mimetype == "text/plain":
-      print(f"\nNew message from {sender}!: {data.decode()}\n")
+      print(f"\nNew direct message from {sender}!: {data.decode()}\n")
    else:
       if "filename" not in headers:
          raise ServerError(conn, message, "Must give a filename in headers.")

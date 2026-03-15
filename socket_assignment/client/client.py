@@ -21,6 +21,7 @@ import nacl.signing
 import nacl.encoding
 from socket_assignment.peer.peer import listen_peer , create_peer_socket_client
 from socket_assignment.security.auth import generate_keypair, authenticate_flow_client
+from socket_assignment.server import SERVER_PORT
 from socket_assignment.server.message_handling import check_message_is_reply, send_message_to_user
 from socket_assignment.storage import load_groups, load_media, load_users,store_message_in_chat, delete_connection, store_signing_key, load_sign_verify_key, find_chat_with_name
 from socket_assignment.client.client_sending import send_message , send_session, send_pending_messages
@@ -38,12 +39,17 @@ async def ask_for_message(dest_id):
     "GeT input from the command line to get the data for a text message."
     type_msg = (await get_input_async("(F)ile/(T)ext:\n")).upper()[:1]
     if (type_msg == "F"):
-        path = await get_input_async("Path:\n")
-        with open(path, "rb") as fd:
-            filename = Path(path).name
-            data = fd.read()
-            mimetype = guess_type(path)[0]
-            return (data, mimetype, filename )
+        while True :
+            path = await get_input_async("Path:\n")
+            try :
+                with open(path, "rb") as fd:
+                    filename = Path(path).name
+                    data = fd.read()
+                    mimetype = guess_type(path)[0]
+                    return (data, mimetype, filename )
+            except FileNotFoundError:
+                print(f"File with path {path} doesn't exist.\n") 
+        return None,None,None
     elif type_msg == "T":
         text = await get_input_async("Write your text message:\n")
         mimetype = "text/plain"
@@ -209,7 +215,13 @@ async def command_loop(conn_id, username):
                     continue
                 chat_name = parts[1]
                 chat_id = find_chat_with_name(chat_name, group_chats)
+                if chat_id not in group_chats:
+                    print(f"You are not in chat with name {chat_name}.") 
+                    continue
                 data, mimetype, filename = await ask_for_message(chat_id)
+                if data is None:
+                    print("Cancelling sending message!")  
+                    continue
                 msg = create_chat_message(username, chat_id, data, mimetype, filename=filename)
                 response = await send_message(conn, msg)
                 if response["command"] == "ACK":
@@ -227,6 +239,9 @@ async def command_loop(conn_id, username):
                     continue
 
                 data, mimetype, filename = await ask_for_message(other)
+                if data is None:
+                    print("Cancelling sending message!")  
+                    continue
 
                 msg = create_direct_message(username, other , data, mimetype, filename=filename)
                 resp = await send_message_to_user(username,other, msg, awaitable=True) # make this ture in order to get a response
@@ -358,16 +373,15 @@ def get_local_ip():
         
 
 async def run_client():
-    server_host = input("Enter ip adress of server:\n") 
+    server_host = input("Enter ip adress of server (default is 127.0.0.1):\n") 
     if not server_host:
         server_host = "127.0.0.1"
-    server_port = 5000
 
     ip = get_local_ip()
     if ip :
         print("local network I.P:",ip)
     else:
-        print("Unable to get local I.P address, using localhost.")
+        print("Unable to get local I.P address, using 127.0.0.1")
         ip = "127.0.0.1"
 
     socket_assignment.peer.peer_tcp_ip = ip
@@ -383,19 +397,24 @@ async def run_client():
         store_signing_key(client_signing_key, private_key_path)
 
     else:
-        private_key_path = input("Give the path to private key:\n")
-        client_signing_key, client_verifier_key = load_sign_verify_key(private_key_path)
+        while True:
+            private_key_path = input("Give the path to private key:\n")
+            try :
+                client_signing_key, client_verifier_key = load_sign_verify_key(private_key_path)
+                break
+            except FileNotFoundError:
+                print(f"File with path {private_key_path} doesn't exist.")
+
 
     socket_assignment.client.client_signing_key = client_signing_key 
     socket_assignment.client.client_verifier_key = client_verifier_key
 
 
-    sock = socket.socket()
-    sock.setblocking(False)
+    sock = create_socket() 
     loop = asyncio.get_running_loop()
     try :
-        await loop.sock_connect(sock, (server_host, server_port))
-        print(f"\nConnected to server {server_host}:{server_port}")
+        await loop.sock_connect(sock, (server_host, SERVER_PORT))
+        print(f"\nConnected to server {server_host}:{SERVER_PORT}")
 
         server_conn_id = "server"
 
@@ -403,16 +422,20 @@ async def run_client():
 
         listener_task = asyncio.create_task(client_listener(server_conn_id))
 
+        # set up listening for UDP messages from the server
         socket_assignment.client.udp_port = bind_udp_port(udp_socket)
         udp_port = socket_assignment.client.udp_port
         
-        asyncio.create_task(udp_listener(udp_socket))
+        udp_task = asyncio.create_task(udp_listener(udp_socket))
+
+        # load data from json files
 
         socket_assignment.group_chats = load_groups(username)
         socket_assignment.users = load_users(username)
         socket_assignment.media = load_media(username)
 
         print("Starting peer server")
+        # Starting the peer server at the specified port and ip address
         peer_socket = bind_peer_socket()
         peer_tcp_port = socket_assignment.peer.peer_tcp_port
 
@@ -424,6 +447,7 @@ async def run_client():
 
         close(sock)
         listener_task.cancel()
+        udp_task.cancel()
         print("Disconnected")
 
     except ConnectionRefusedError as cre:

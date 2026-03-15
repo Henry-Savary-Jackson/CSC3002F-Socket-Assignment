@@ -12,6 +12,7 @@ from socket_assignment import media
 MAX_CONNECTIONS = 100
 
 server_sock = create_socket()
+SERVER_PORT = 5000
 
 def disconnect_server(conn_id):
     users = socket_assignment.users
